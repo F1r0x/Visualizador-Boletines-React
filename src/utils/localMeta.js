@@ -8,6 +8,16 @@ export const ESTADOS = [
   'Terminado',
 ]
 
+export const CHECKLIST_ITEMS = [
+  'Llegada',
+  'Diagnóstico',
+  'Presupuesto',
+  'Pieza',
+  'Reparación',
+  'Prueba',
+  'Firma',
+]
+
 export function avisoKey(aviso) {
   return String(aviso?.aviso ?? aviso?.orden ?? '')
 }
@@ -29,10 +39,19 @@ function saveAll(data) {
   }
 }
 
+const DEFAULT_META = {
+  estado: 'Pendiente',
+  nota: '',
+  checklist: {},
+  inicioVisita: '',
+  finVisita: '',
+  piezas: [],
+}
+
 export function getMeta(aviso) {
   const all = loadAll()
   const key = avisoKey(aviso)
-  return all[key] || { estado: 'Pendiente', nota: '' }
+  return { ...DEFAULT_META, ...(all[key] || {}) }
 }
 
 export function setMeta(aviso, patch) {
