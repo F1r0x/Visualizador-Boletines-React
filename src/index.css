@@ -169,6 +169,37 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
 .section dd { word-break: break-word; }
 .section dd.empty { color: var(--muted); font-style: italic; }
 
+.section dd.copyable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0.1rem 0.25rem;
+  margin: -0.1rem -0.25rem;
+  transition: background 0.15s;
+  position: relative;
+}
+.section dd.copyable:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+.section dd.copyable.copied {
+  background: rgba(34, 197, 94, 0.2);
+}
+.copy-toast {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  background: var(--success);
+  border-radius: 4px;
+  vertical-align: middle;
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .maps-btn {
   display: inline-block;
   margin-left: 0.4rem;
