@@ -183,6 +183,39 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
 .section dd.copyable.copied {
   background: rgba(34, 197, 94, 0.2);
 }
+
+.telefonos-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.tel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tel-chip:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: var(--accent);
+}
+
+.tel-chip.copied {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: var(--success);
+}
+
 .copy-toast {
   display: inline-block;
   margin-left: 0.45rem;
