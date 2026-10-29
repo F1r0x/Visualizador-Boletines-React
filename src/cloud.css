@@ -1,0 +1,33 @@
+/* Importado desde main si se desea; estilos también documentados en SUPABASE.md */
+.cloud-panel {
+  margin-top: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+.cloud-panel h3 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+.cloud-panel a { color: var(--accent); }
+.env-hint {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+  color: var(--muted);
+}
+.cloud-tabs { display: flex; gap: 0.35rem; margin-bottom: 0.75rem; }
+.cloud-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+.cloud-search { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+.cloud-search input {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.9rem;
+}
+.cloud-stats { display: flex; flex-wrap: wrap; gap: 0.75rem; }
