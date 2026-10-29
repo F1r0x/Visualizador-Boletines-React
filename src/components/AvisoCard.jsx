@@ -58,6 +58,66 @@ function Field({ label, value, copyable = false }) {
   )
 }
 
+function parseTelefonos(value) {
+  if (value == null || value === '') return []
+  if (Array.isArray(value)) {
+    return value.map((t) => String(t).trim()).filter(Boolean)
+  }
+  return String(value)
+    .split(/[,;/|]+/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+}
+
+function TelefonoChip({ numero }) {
+  const [copied, setCopied] = useState(false)
+
+  const onCopy = async (e) => {
+    e.stopPropagation()
+    const ok = await copiarTexto(numero)
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`tel-chip${copied ? ' copied' : ''}`}
+      onClick={onCopy}
+      title="Clic para copiar este número"
+    >
+      {numero}
+      {copied && <span className="copy-toast">Copiado</span>}
+    </button>
+  )
+}
+
+function TelefonosField({ value }) {
+  const lista = parseTelefonos(value)
+
+  if (!lista.length) {
+    return (
+      <>
+        <dt>Teléfono</dt>
+        <dd className="empty">—</dd>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <dt>Teléfono</dt>
+      <dd className="telefonos-list">
+        {lista.map((num, i) => (
+          <TelefonoChip key={`${num}-${i}`} numero={num} />
+        ))}
+      </dd>
+    </>
+  )
+}
+
 function DireccionField({ direccion, codigoPostal }) {
   const dir = val(direccion)
   const cp = val(codigoPostal)
@@ -122,7 +182,7 @@ export default function AvisoCard({ aviso }) {
           <h3>Datos del usuario</h3>
           <dl>
             <Field label="Nombre" value={a.cliente?.nombre} copyable />
-            <Field label="Teléfono" value={a.cliente?.telefonos} copyable />
+            <TelefonosField value={a.cliente?.telefonos} />
             <Field label="NIF" value={a.cliente?.nif} />
             <DireccionField
               direccion={a.direccion?.completa}
