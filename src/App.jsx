@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import AvisoCard from './components/AvisoCard'
 import CalendarioView from './components/CalendarioView'
+import CloudPanel from './components/CloudPanel'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { DEMO_AVISOS } from './data/demoAvisos'
 import { getMeta, ESTADOS } from './utils/localMeta'
@@ -25,6 +26,7 @@ export default function App() {
   const [metaTick, setMetaTick] = useState(0)
   const [historial, setHistorial] = useState([])
   const [showHist, setShowHist] = useState(false)
+  const [showCloud, setShowCloud] = useState(false)
   const [vista, setVista] = useState('lista')
   const [scrollToAviso, setScrollToAviso] = useState(null)
   const inputRef = useRef(null)
@@ -146,10 +148,24 @@ export default function App() {
           <button className="btn" onClick={procesarPdf} disabled={loading || !file}>Procesar PDF</button>
           <button className="btn btn-secondary" onClick={cargarDemo}>Cargar datos de ejemplo</button>
           <button className="btn btn-secondary" onClick={() => setShowHist((v) => !v)}>Historial ({historial.length})</button>
+          <button className="btn btn-secondary" onClick={() => setShowCloud((v) => !v)}>Nube / BD</button>
           {avisos.length > 0 && (
             <button className="btn btn-secondary" onClick={() => exportAvisosCsv(avisosFiltrados)}>Exportar CSV</button>
           )}
         </div>
+
+        {showCloud && (
+          <CloudPanel
+            avisos={avisos}
+            onLoadAvisos={(lista) => {
+              setAvisos(lista)
+              setMetaTick((t) => t + 1)
+              setShowCloud(false)
+              setVista('lista')
+            }}
+            onStatus={setStatus}
+          />
+        )}
 
         {showHist && (
           <div className="historial-panel">
@@ -238,7 +254,7 @@ export default function App() {
         )}
       </div>
 
-      <footer>React + Vite · n8n · Lista, calendario y citas se guardan en este navegador</footer>
+      <footer>React + Vite · n8n · Supabase opcional para nube multi-dispositivo</footer>
     </div>
   )
 }
