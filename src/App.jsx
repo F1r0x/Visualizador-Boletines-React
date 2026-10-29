@@ -1,9 +1,14 @@
-import { useState, useRef, useCallback, useMemo } from 'react'
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import AvisoCard from './components/AvisoCard'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { DEMO_AVISOS } from './data/demoAvisos'
 import { getMeta, ESTADOS } from './utils/localMeta'
 import { exportAvisosCsv } from './utils/exportCsv'
+import {
+  listHistorial,
+  saveHistorialEntry,
+  deleteHistorialEntry,
+} from './utils/historial'
 
 const WEBHOOK_URL = 'https://n8n.automatizatutrabajo.com/webhook/boletines'
 
@@ -17,7 +22,18 @@ export default function App() {
   const [filtroMarca, setFiltroMarca] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [metaTick, setMetaTick] = useState(0)
+  const [historial, setHistorial] = useState([])
+  const [showHist, setShowHist] = useState(false)
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    setHistorial(listHistorial())
+  }, [])
+
+  const guardarEnHistorial = (lista, nombre) => {
+    saveHistorialEntry({ nombre, avisos: lista })
+    setHistorial(listHistorial())
+  }
 
   const setFileSafe = useCallback((f) => {
     if (!f) return
@@ -41,10 +57,25 @@ export default function App() {
 
   const cargarDemo = () => {
     setAvisos(DEMO_AVISOS)
+    guardarEnHistorial(DEMO_AVISOS, 'Datos de ejemplo')
     setStatus({
       msg: `Mostrando ${DEMO_AVISOS.length} avisos de ejemplo.`,
       type: 'success',
     })
+  }
+
+  const cargarHistorial = (entry) => {
+    setAvisos(entry.avisos || [])
+    setShowHist(false)
+    setStatus({
+      msg: `Cargado del historial: ${entry.nombre} (${entry.count} avisos).`,
+      type: 'success',
+    })
+  }
+
+  const borrarHistorial = (id, e) => {
+    e.stopPropagation()
+    setHistorial(deleteHistorialEntry(id))
   }
 
   const procesarPdf = async () => {
@@ -64,6 +95,7 @@ export default function App() {
       try { data = JSON.parse(rawText) } catch { throw new Error('La respuesta no es JSON valido: ' + rawText.slice(0, 150)) }
       const lista = normalizarRespuestaN8n(data)
       setAvisos(lista)
+      guardarEnHistorial(lista, file?.name || 'Boletin PDF')
       setStatus({ msg: `PDF procesado correctamente. ${lista.length} avisos recibidos.`, type: 'success' })
     } catch (err) {
       console.error(err)
@@ -121,10 +153,32 @@ export default function App() {
         <div className="btn-row">
           <button className="btn" onClick={procesarPdf} disabled={loading || !file}>Procesar PDF</button>
           <button className="btn btn-secondary" onClick={cargarDemo}>Cargar datos de ejemplo</button>
+          <button className="btn btn-secondary" onClick={() => setShowHist((v) => !v)}>Historial ({historial.length})</button>
           {avisos.length > 0 && (
-            <button className="btn btn-secondary" onClick={() => exportAvisosCsv(avisosFiltrados)} title="Exportar avisos visibles a CSV">Exportar CSV</button>
+            <button className="btn btn-secondary" onClick={() => exportAvisosCsv(avisosFiltrados)}>Exportar CSV</button>
           )}
         </div>
+
+        {showHist && (
+          <div className="historial-panel">
+            <h3>Historial local</h3>
+            {historial.length === 0 ? (
+              <p className="hist-empty">Aun no hay boletines guardados en este navegador.</p>
+            ) : (
+              <ul className="hist-list">
+                {historial.map((h) => (
+                  <li key={h.id}>
+                    <button type="button" className="hist-item" onClick={() => cargarHistorial(h)}>
+                      <span className="hist-name">{h.nombre}</span>
+                      <span className="hist-meta">{h.count} avisos · {new Date(h.fecha).toLocaleString('es-ES')}</span>
+                    </button>
+                    <button type="button" className="btn-x" onClick={(e) => borrarHistorial(h.id, e)} title="Eliminar">×</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {status.msg && <div className={`status ${status.type}`}>{status.msg}</div>}
       </div>
@@ -170,7 +224,7 @@ export default function App() {
         )}
       </div>
 
-      <footer>React + Vite · n8n produccion · Estados y notas se guardan en este navegador</footer>
+      <footer>React + Vite · n8n · Historial, estados y notas se guardan en este navegador</footer>
     </div>
   )
 }
