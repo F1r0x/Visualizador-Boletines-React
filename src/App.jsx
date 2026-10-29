@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import AvisoCard from './components/AvisoCard'
+import CalendarioView from './components/CalendarioView'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { DEMO_AVISOS } from './data/demoAvisos'
 import { getMeta, ESTADOS } from './utils/localMeta'
@@ -24,11 +25,11 @@ export default function App() {
   const [metaTick, setMetaTick] = useState(0)
   const [historial, setHistorial] = useState([])
   const [showHist, setShowHist] = useState(false)
+  const [vista, setVista] = useState('lista')
+  const [scrollToAviso, setScrollToAviso] = useState(null)
   const inputRef = useRef(null)
 
-  useEffect(() => {
-    setHistorial(listHistorial())
-  }, [])
+  useEffect(() => { setHistorial(listHistorial()) }, [])
 
   const guardarEnHistorial = (lista, nombre) => {
     saveHistorialEntry({ nombre, avisos: lista })
@@ -42,10 +43,7 @@ export default function App() {
       return
     }
     setFile(f)
-    setStatus({
-      msg: `PDF listo: ${f.name} (${(f.size / 1024).toFixed(1)} KB)`,
-      type: 'success',
-    })
+    setStatus({ msg: `PDF listo: ${f.name} (${(f.size / 1024).toFixed(1)} KB)`, type: 'success' })
   }, [])
 
   const onDrop = (e) => {
@@ -58,19 +56,13 @@ export default function App() {
   const cargarDemo = () => {
     setAvisos(DEMO_AVISOS)
     guardarEnHistorial(DEMO_AVISOS, 'Datos de ejemplo')
-    setStatus({
-      msg: `Mostrando ${DEMO_AVISOS.length} avisos de ejemplo.`,
-      type: 'success',
-    })
+    setStatus({ msg: `Mostrando ${DEMO_AVISOS.length} avisos de ejemplo.`, type: 'success' })
   }
 
   const cargarHistorial = (entry) => {
     setAvisos(entry.avisos || [])
     setShowHist(false)
-    setStatus({
-      msg: `Cargado del historial: ${entry.nombre} (${entry.count} avisos).`,
-      type: 'success',
-    })
+    setStatus({ msg: `Cargado del historial: ${entry.nombre} (${entry.count} avisos).`, type: 'success' })
   }
 
   const borrarHistorial = (id, e) => {
@@ -185,19 +177,27 @@ export default function App() {
 
       {avisos.length > 0 && (
         <div className="toolbar">
-          <input type="search" className="search-input" placeholder="Buscar nombre, aviso, modelo, CP..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-          <select value={filtroMarca} onChange={(e) => setFiltroMarca(e.target.value)} className="filter-select">
-            <option value="">Todas las marcas</option>
-            {marcasDisponibles.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="filter-select">
-            <option value="">Todos los estados</option>
-            {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
-          </select>
+          <div className="vista-toggle">
+            <button type="button" className={vista === 'lista' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('lista')}>Lista</button>
+            <button type="button" className={vista === 'calendario' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('calendario')}>Calendario</button>
+          </div>
+          {vista === 'lista' && (
+            <>
+              <input type="search" className="search-input" placeholder="Buscar nombre, aviso, modelo, CP..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+              <select value={filtroMarca} onChange={(e) => setFiltroMarca(e.target.value)} className="filter-select">
+                <option value="">Todas las marcas</option>
+                {marcasDisponibles.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="filter-select">
+                <option value="">Todos los estados</option>
+                {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </>
+          )}
         </div>
       )}
 
-      {avisos.length > 0 && (
+      {avisos.length > 0 && vista === 'lista' && (
         <div className="summary">
           <div className="stat">
             <div className="num">{avisosFiltrados.length}</div>
@@ -212,19 +212,33 @@ export default function App() {
         </div>
       )}
 
+      {avisos.length > 0 && vista === 'calendario' && (
+        <CalendarioView
+          avisos={avisos}
+          metaTick={metaTick}
+          onSelectAviso={(a) => {
+            setVista('lista')
+            setScrollToAviso(String(a.aviso ?? a.orden))
+            setTimeout(() => setScrollToAviso(null), 2000)
+          }}
+        />
+      )}
+
       <div className="avisos">
         {avisos.length === 0 ? (
           <div className="empty-state"><p>Selecciona un PDF y pulsa <strong>Procesar PDF</strong><br />o carga los datos de ejemplo.</p></div>
-        ) : avisosFiltrados.length === 0 ? (
+        ) : vista === 'calendario' ? null : avisosFiltrados.length === 0 ? (
           <div className="empty-state"><p>Ningun aviso coincide con los filtros.</p></div>
         ) : (
           avisosFiltrados.map((a, i) => (
-            <AvisoCard key={`${a.orden}-${a.aviso}-${i}`} aviso={a} onMetaChange={() => setMetaTick((t) => t + 1)} />
+            <div key={`${a.orden}-${a.aviso}-${i}`} id={`aviso-${a.aviso}`} className={scrollToAviso && String(a.aviso) === scrollToAviso ? 'aviso-highlight-wrap' : undefined}>
+              <AvisoCard aviso={a} onMetaChange={() => setMetaTick((t) => t + 1)} />
+            </div>
           ))
         )}
       </div>
 
-      <footer>React + Vite · n8n · Historial, estados y notas se guardan en este navegador</footer>
+      <footer>React + Vite · n8n · Lista, calendario y citas se guardan en este navegador</footer>
     </div>
   )
 }
