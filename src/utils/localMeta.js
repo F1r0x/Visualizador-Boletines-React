@@ -18,6 +18,8 @@ export const CHECKLIST_ITEMS = [
   'Firma',
 ]
 
+export const FRANJAS = ['Sin franja', 'Mañana', 'Tarde', 'Urgencia']
+
 export function avisoKey(aviso) {
   return String(aviso?.aviso ?? aviso?.orden ?? '')
 }
@@ -34,9 +36,7 @@ function loadAll() {
 function saveAll(data) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    /* quota or private mode */
-  }
+  } catch {}
 }
 
 const DEFAULT_META = {
@@ -46,6 +46,9 @@ const DEFAULT_META = {
   inicioVisita: '',
   finVisita: '',
   piezas: [],
+  citaFecha: '',
+  citaHora: '',
+  franja: '',
 }
 
 export function getMeta(aviso) {
