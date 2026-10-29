@@ -1,22 +1,95 @@
+import { useState } from 'react'
 import { val, mapsUrl } from '../utils/parseAvisos'
 
-function Field({ label, value }) {
+async function copiarTexto(texto) {
+  if (!texto) return false
+  try {
+    await navigator.clipboard.writeText(texto)
+    return true
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = texto
+      ta.style.position = 'fixed'
+      ta.style.left = '-9999px'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    } catch {
+      return false
+    }
+  }
+}
+
+function Field({ label, value, copyable = false }) {
   const v = val(value)
+  const [copied, setCopied] = useState(false)
+
+  const onCopy = async () => {
+    if (!copyable || !v) return
+    const ok = await copiarTexto(v)
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+  }
+
   return (
     <>
       <dt>{label}</dt>
-      <dd className={v ? '' : 'empty'}>{v || '—'}</dd>
+      <dd
+        className={[
+          v ? '' : 'empty',
+          copyable && v ? 'copyable' : '',
+          copied ? 'copied' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        onClick={copyable && v ? onCopy : undefined}
+        title={copyable && v ? 'Clic para copiar' : undefined}
+        role={copyable && v ? 'button' : undefined}
+      >
+        {v || '—'}
+        {copied && <span className="copy-toast">Copiado</span>}
+      </dd>
     </>
   )
 }
 
 function DireccionField({ direccion, codigoPostal }) {
   const dir = val(direccion)
+  const cp = val(codigoPostal)
+  const textoCompleto = [dir, cp].filter(Boolean).join(', ')
   const url = mapsUrl(direccion, codigoPostal)
+  const [copied, setCopied] = useState(false)
+
+  const onCopy = async (e) => {
+    if (e.target.closest('a')) return
+    if (!textoCompleto) return
+    const ok = await copiarTexto(textoCompleto)
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+  }
+
   return (
     <>
       <dt>Dirección</dt>
-      <dd className={dir ? '' : 'empty'}>
+      <dd
+        className={[
+          dir ? '' : 'empty',
+          dir ? 'copyable' : '',
+          copied ? 'copied' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        onClick={dir ? onCopy : undefined}
+        title={dir ? 'Clic para copiar la dirección' : undefined}
+        role={dir ? 'button' : undefined}
+      >
         {dir || '—'}
         {url && (
           <a
@@ -25,10 +98,12 @@ function DireccionField({ direccion, codigoPostal }) {
             target="_blank"
             rel="noopener noreferrer"
             title="Abrir en Google Maps"
+            onClick={(e) => e.stopPropagation()}
           >
             📍 Maps
           </a>
         )}
+        {copied && <span className="copy-toast">Copiado</span>}
       </dd>
     </>
   )
@@ -46,8 +121,8 @@ export default function AvisoCard({ aviso }) {
         <div className="section">
           <h3>Datos del usuario</h3>
           <dl>
-            <Field label="Nombre" value={a.cliente?.nombre} />
-            <Field label="Teléfono" value={a.cliente?.telefonos} />
+            <Field label="Nombre" value={a.cliente?.nombre} copyable />
+            <Field label="Teléfono" value={a.cliente?.telefonos} copyable />
             <Field label="NIF" value={a.cliente?.nif} />
             <DireccionField
               direccion={a.direccion?.completa}
@@ -60,7 +135,7 @@ export default function AvisoCard({ aviso }) {
           <h3>Datos del aparato</h3>
           <dl>
             <Field label="Marca" value={a.aparato?.marca} />
-            <Field label="Modelo / KI" value={a.aparato?.modelo} />
+            <Field label="Modelo / KI" value={a.aparato?.modelo} copyable />
             <Field label="Tipo" value={a.aparato?.tipo} />
           </dl>
         </div>
