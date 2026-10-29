@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { val, mapsUrl } from '../utils/parseAvisos'
-import { ESTADOS, CHECKLIST_ITEMS, getMeta, setMeta } from '../utils/localMeta'
+import { ESTADOS, CHECKLIST_ITEMS, FRANJAS, getMeta, setMeta } from '../utils/localMeta'
 import { plantillaWhatsApp } from '../utils/whatsapp'
 import { urgenciaFecha, formatoDuracion } from '../utils/fechas'
 
@@ -114,12 +114,16 @@ export default function AvisoCard({ aviso, onMetaChange }) {
   const [finVisita, setFinVisita] = useState(initial.finVisita || '')
   const [piezas, setPiezas] = useState(initial.piezas || [])
   const [nuevaPieza, setNuevaPieza] = useState('')
+  const [citaFecha, setCitaFecha] = useState(initial.citaFecha || '')
+  const [citaHora, setCitaHora] = useState(initial.citaHora || '')
+  const [franja, setFranja] = useState(initial.franja || '')
   const [waOk, setWaOk] = useState(false)
 
   useEffect(() => {
     const m = getMeta(a)
     setEstado(m.estado); setNota(m.nota); setChecklist(m.checklist || {})
     setInicioVisita(m.inicioVisita || ''); setFinVisita(m.finVisita || ''); setPiezas(m.piezas || [])
+    setCitaFecha(m.citaFecha || ''); setCitaHora(m.citaHora || ''); setFranja(m.franja || '')
   }, [a.aviso, a.orden])
 
   const persist = (patch) => { setMeta(a, patch); onMetaChange?.() }
@@ -160,6 +164,20 @@ export default function AvisoCard({ aviso, onMetaChange }) {
       <div className="aviso-nota">
         <label htmlFor={`nota-${a.aviso}`}>Nota del técnico</label>
         <textarea id={`nota-${a.aviso}`} rows={2} placeholder="Ej: llevar junta, llamar antes..." value={nota} onChange={guardarNota} />
+      </div>
+
+      <div className="aviso-cita">
+        <h4>Cita planificada</h4>
+        <div className="cita-row">
+          <input type="date" value={citaFecha} onChange={(e) => { const v = e.target.value; setCitaFecha(v); persist({ citaFecha: v }) }} title="Fecha de la cita" />
+          <input type="time" value={citaHora} onChange={(e) => { const v = e.target.value; setCitaHora(v); persist({ citaHora: v }) }} title="Hora aproximada" />
+          <select value={franja || 'Sin franja'} onChange={(e) => { const v = e.target.value === 'Sin franja' ? '' : e.target.value; setFranja(v); persist({ franja: v }) }}>
+            {FRANJAS.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+          {(citaFecha || citaHora || franja) && (
+            <button type="button" className="btn-sm" onClick={() => { setCitaFecha(''); setCitaHora(''); setFranja(''); persist({ citaFecha: '', citaHora: '', franja: '' }) }}>Quitar cita</button>
+          )}
+        </div>
       </div>
 
       <div className="aviso-tools">
