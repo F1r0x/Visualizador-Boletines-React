@@ -36,20 +36,6 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
   margin-bottom: 1.75rem;
 }
 
-.field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.75rem; }
-.field label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
-.field input[type='url'],
-.field input[type='text'] {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.65rem 0.9rem;
-  color: var(--text);
-  font-size: 0.95rem;
-  outline: none;
-}
-.field input:focus { border-color: var(--accent); }
-
 .drop-zone {
   border: 2px dashed var(--border);
   border-radius: 10px;
@@ -58,10 +44,8 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
   cursor: pointer;
   background: var(--bg);
   transition: border-color 0.15s, background 0.15s;
-  margin-top: 0.5rem;
 }
-.drop-zone:hover,
-.drop-zone.dragover {
+.drop-zone:hover, .drop-zone.dragover {
   border-color: var(--accent);
   background: rgba(59, 130, 246, 0.08);
 }
@@ -103,6 +87,25 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
 .status.success { color: var(--success); }
 .status.loading { color: var(--warning); }
 
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+.search-input, .filter-select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 0.55rem 0.85rem;
+  font-size: 0.9rem;
+  outline: none;
+}
+.search-input { flex: 1 1 200px; min-width: 160px; }
+.search-input:focus, .filter-select:focus { border-color: var(--accent); }
+.filter-select { cursor: pointer; }
+
 .summary { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .stat {
   background: var(--card);
@@ -140,6 +143,58 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
   font-size: 0.85rem;
   font-weight: 600;
 }
+.header-left { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.header-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.estado-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-wa {
+  background: #25d366;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-wa:hover { background: #1ebe57; }
+
+.aviso-nota { padding: 0.75rem 1.25rem 0; }
+.aviso-nota label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+.aviso-nota textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 2.5rem;
+}
+.aviso-nota textarea:focus { outline: none; border-color: var(--accent); }
+
+.aviso-card.estado-terminado { opacity: 0.72; border-color: #22c55e55; }
+.aviso-card.estado-pieza-pedida { border-color: #f59e0b66; }
+.aviso-card.estado-en-curso, .aviso-card.estado-en-camino { border-color: #3b82f666; }
+
 .aviso-body {
   padding: 1.1rem 1.25rem 1.25rem;
   display: grid;
@@ -175,22 +230,11 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
   padding: 0.1rem 0.25rem;
   margin: -0.1rem -0.25rem;
   transition: background 0.15s;
-  position: relative;
 }
-.section dd.copyable:hover {
-  background: rgba(59, 130, 246, 0.15);
-}
-.section dd.copyable.copied {
-  background: rgba(34, 197, 94, 0.2);
-}
+.section dd.copyable:hover { background: rgba(59, 130, 246, 0.15); }
+.section dd.copyable.copied { background: rgba(34, 197, 94, 0.2); }
 
-.telefonos-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  align-items: center;
-}
-
+.telefonos-list { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .tel-chip {
   display: inline-flex;
   align-items: center;
@@ -203,18 +247,9 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
   border-radius: 6px;
   padding: 0.2rem 0.55rem;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
 }
-
-.tel-chip:hover {
-  background: rgba(59, 130, 246, 0.25);
-  border-color: var(--accent);
-}
-
-.tel-chip.copied {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: var(--success);
-}
+.tel-chip:hover { background: rgba(59, 130, 246, 0.25); border-color: var(--accent); }
+.tel-chip.copied { background: rgba(34, 197, 94, 0.2); border-color: var(--success); }
 
 .copy-toast {
   display: inline-block;
@@ -225,12 +260,6 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
   color: white;
   background: var(--success);
   border-radius: 4px;
-  vertical-align: middle;
-  animation: fadeIn 0.15s ease;
-}
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-2px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .maps-btn {
@@ -243,8 +272,6 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
   background: #1a73e8;
   border-radius: 6px;
   text-decoration: none;
-  vertical-align: middle;
-  white-space: nowrap;
 }
 .maps-btn:hover { background: #1557b0; }
 
