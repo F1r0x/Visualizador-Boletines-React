@@ -51,41 +51,22 @@ export default function App() {
     }
 
     setLoading(true)
-    setStatus({
-      msg: 'Subiendo PDF y ejecutando workflow…',
-      type: 'loading',
-    })
+    setStatus({ msg: 'Subiendo PDF y ejecutando workflow...', type: 'loading' })
 
     try {
       const formData = new FormData()
       formData.append('data', file, file.name)
-
-      const res = await fetch(webhookUrl.trim(), {
-        method: 'POST',
-        body: formData,
-      })
-
+      const res = await fetch(webhookUrl.trim(), { method: 'POST', body: formData })
       const rawText = await res.text()
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText} — ${rawText.slice(0, 200)}`)
-      }
-
+      if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + res.statusText + ' - ' + rawText.slice(0, 200))
       let data
-      try {
-        data = JSON.parse(rawText)
-      } catch {
-        throw new Error('La respuesta no es JSON válido: ' + rawText.slice(0, 150))
-      }
-
+      try { data = JSON.parse(rawText) } catch { throw new Error('La respuesta no es JSON valido: ' + rawText.slice(0, 150)) }
       const lista = normalizarRespuestaN8n(data)
       setAvisos(lista)
-      setStatus({
-        msg: `PDF procesado correctamente. ${lista.length} avisos recibidos.`,
-        type: 'success',
-      })
+      setStatus({ msg: 'PDF procesado correctamente. ' + lista.length + ' avisos recibidos.', type: 'success' })
     } catch (err) {
       console.error(err)
-      setStatus({ msg: `Error: ${err.message}`, type: 'error' })
+      setStatus({ msg: 'Error: ' + err.message, type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -93,7 +74,7 @@ export default function App() {
 
   const marcas = {}
   avisos.forEach((a) => {
-    const m = val(a.aparato?.marca) || 'Sin marca'
+    const m = val(a.aparato && a.aparato.marca) || 'Sin marca'
     marcas[m] = (marcas[m] || 0) + 1
   })
 
@@ -101,7 +82,7 @@ export default function App() {
     <div className="container">
       <header>
         <h1>Boletines de Servicio</h1>
-        <p>Sube el PDF del boletín → n8n lo procesa → ves todos los avisos</p>
+        <p>Sube el PDF del boletin, n8n lo procesa y ves todos los avisos</p>
       </header>
 
       <div className="controls">
@@ -117,12 +98,9 @@ export default function App() {
         </div>
 
         <div
-          className={`drop-zone ${dragOver ? 'dragover' : ''} ${file ? 'has-file' : ''}`}
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault()
-            setDragOver(true)
-          }}
+          className={'drop-zone' + (dragOver ? ' dragover' : '') + (file ? ' has-file' : '')}
+          onClick={() => inputRef.current && inputRef.current.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
         >
@@ -130,25 +108,17 @@ export default function App() {
             ref={inputRef}
             type="file"
             accept="application/pdf,.pdf"
-            onChange={(e) => setFileSafe(e.target.files?.[0])}
+            onChange={(e) => setFileSafe(e.target.files && e.target.files[0])}
           />
-          <div style={{ fontSize: '1.8rem', marginBottom: '0.4rem' }}>📄</div>
-          <div className="hint">
-            Arrastra aquí el PDF del boletín o haz clic para seleccionarlo
-          </div>
+          <div style={{ fontSize: '1.8rem', marginBottom: '0.4rem' }}>PDF</div>
+          <div className="hint">Arrastra aqui el PDF del boletin o haz clic para seleccionarlo</div>
           {file && (
-            <div className="filename">
-              {file.name} ({(file.size / 1024).toFixed(1)} KB)
-            </div>
+            <div className="filename">{file.name} ({(file.size / 1024).toFixed(1)} KB)</div>
           )}
         </div>
 
         <div className="btn-row">
-          <button
-            className="btn"
-            onClick={procesarPdf}
-            disabled={loading || !file}
-          >
+          <button className="btn" onClick={procesarPdf} disabled={loading || !file}>
             Procesar PDF
           </button>
           <button className="btn btn-secondary" onClick={cargarDemo}>
@@ -156,9 +126,7 @@ export default function App() {
           </button>
         </div>
 
-        {status.msg && (
-          <div className={`status ${status.type}`}>{status.msg}</div>
-        )}
+        {status.msg && <div className={'status ' + status.type}>{status.msg}</div>}
       </div>
 
       {avisos.length > 0 && (
@@ -182,18 +150,18 @@ export default function App() {
             <p>
               Selecciona un PDF y pulsa <strong>Procesar PDF</strong>
               <br />
-              o carga los datos de ejemplo para ver cómo queda.
+              o carga los datos de ejemplo para ver como queda.
             </p>
           </div>
         ) : (
           avisos.map((a, i) => (
-            <AvisoCard key={`${a.orden}-${a.aviso}-${i}`} aviso={a} />
+            <AvisoCard key={String(a.orden) + '-' + String(a.aviso) + '-' + i} aviso={a} />
           ))
         )}
       </div>
 
       <footer>
-        React + Vite · El PDF se envía al webhook de n8n con el campo <code>data</code>
+        React + Vite - El PDF se envia al webhook de n8n con el campo <code>data</code>
       </footer>
     </div>
   )
