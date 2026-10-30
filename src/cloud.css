@@ -30,3 +30,61 @@
   font-size: 0.9rem;
 }
 .cloud-stats { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--bg, #0f1419);
+}
+.login-loading { color: var(--muted, #8b9bb4); }
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--card, #1a2332);
+  border: 1px solid var(--border, #2d3a4f);
+  border-radius: 16px;
+  padding: 1.75rem 1.5rem;
+}
+.login-brand { text-align: center; margin-bottom: 1.5rem; }
+.login-logo {
+  width: 56px; height: 56px; margin: 0 auto 0.75rem;
+  border-radius: 14px; background: #3b82f6; color: #fff;
+  font-weight: 800; font-size: 1.6rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.login-brand h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+.login-brand p { color: var(--muted, #8b9bb4); font-size: 0.85rem; }
+.login-form label {
+  display: block; font-size: 0.8rem; font-weight: 600;
+  color: var(--muted, #8b9bb4); margin-bottom: 0.85rem;
+}
+.login-form input {
+  display: block; width: 100%; margin-top: 0.35rem;
+  background: var(--bg, #0f1419); border: 1px solid var(--border, #2d3a4f);
+  border-radius: 8px; color: var(--text, #e7ecf3);
+  padding: 0.65rem 0.85rem; font-size: 1rem;
+}
+.login-form input:focus { outline: none; border-color: #3b82f6; }
+.login-error {
+  background: rgba(248, 113, 113, 0.15); color: #f87171;
+  border-radius: 8px; padding: 0.55rem 0.75rem;
+  font-size: 0.85rem; margin-bottom: 0.85rem;
+}
+.login-btn { width: 100%; margin-top: 0.25rem; }
+.login-hint {
+  margin-top: 1rem; font-size: 0.75rem;
+  color: var(--muted, #8b9bb4); text-align: center;
+}
+.header-top {
+  display: flex; flex-wrap: wrap; justify-content: space-between;
+  align-items: flex-start; gap: 0.75rem; text-align: left;
+}
+.header-top h1, .header-top p { text-align: left; }
+.user-bar { display: flex; align-items: center; gap: 0.5rem; }
+.user-email {
+  font-size: 0.8rem; color: var(--muted, #8b9bb4);
+  max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
