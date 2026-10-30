@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import AvisoCard from './components/AvisoCard'
 import CalendarioView from './components/CalendarioView'
 import CloudPanel from './components/CloudPanel'
+import LoginScreen from './components/LoginScreen'
+import { useAuth } from './hooks/useAuth'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { DEMO_AVISOS } from './data/demoAvisos'
 import { getMeta, ESTADOS } from './utils/localMeta'
@@ -15,6 +17,17 @@ import {
 const WEBHOOK_URL = 'https://n8n.automatizatutrabajo.com/webhook/boletines'
 
 export default function App() {
+  const {
+    authEnabled,
+    user,
+    loading: authLoading,
+    error: authError,
+    setError: setAuthError,
+    login,
+    logout,
+    isAuthenticated,
+  } = useAuth()
+
   const [file, setFile] = useState(null)
   const [avisos, setAvisos] = useState([])
   const [status, setStatus] = useState({ msg: '', type: '' })
@@ -31,7 +44,9 @@ export default function App() {
   const [scrollToAviso, setScrollToAviso] = useState(null)
   const inputRef = useRef(null)
 
-  useEffect(() => { setHistorial(listHistorial()) }, [])
+  useEffect(() => {
+    setHistorial(listHistorial())
+  }, [])
 
   const guardarEnHistorial = (lista, nombre) => {
     saveHistorialEntry({ nombre, avisos: lista })
@@ -123,11 +138,39 @@ export default function App() {
     marcasResumen[m] = (marcasResumen[m] || 0) + 1
   })
 
+  if (authLoading) {
+    return (
+      <div className="login-page">
+        <p className="login-loading">Comprobando sesión…</p>
+      </div>
+    )
+  }
+
+  if (authEnabled && !isAuthenticated) {
+    return (
+      <LoginScreen
+        onLogin={login}
+        error={authError}
+        setError={setAuthError}
+      />
+    )
+  }
+
   return (
     <div className="container">
       <header>
-        <h1>Boletines de Servicio</h1>
-        <p>Sube el PDF del boletin, n8n lo procesa y gestiona tus avisos</p>
+        <div className="header-top">
+          <div>
+            <h1>Boletines de Servicio</h1>
+            <p>Sube el PDF del boletin, n8n lo procesa y gestiona tus avisos</p>
+          </div>
+          {authEnabled && user && (
+            <div className="user-bar">
+              <span className="user-email" title={user.email}>{user.email}</span>
+              <button type="button" className="btn-sm" onClick={logout}>Salir</button>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="controls">
@@ -254,7 +297,7 @@ export default function App() {
         )}
       </div>
 
-      <footer>React + Vite · n8n · Supabase opcional para nube multi-dispositivo</footer>
+      <footer>React + Vite · n8n · Login Supabase</footer>
     </div>
   )
 }
