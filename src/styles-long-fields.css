@@ -1,0 +1,22 @@
+/* Textos largos: síntoma, diagnóstico, causa */
+.section dd {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.section.section-averia {
+  grid-column: 1 / -1;
+}
+.section dt.field-long-label {
+  grid-column: 1 / -1;
+  margin-top: 0.45rem;
+}
+.section dd.field-long {
+  grid-column: 1 / -1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  max-height: none;
+  overflow: visible;
+}
