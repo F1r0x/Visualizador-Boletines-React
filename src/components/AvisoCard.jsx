@@ -44,6 +44,16 @@ function Field({ label, value, copyable = false }) {
   )
 }
 
+function LongField({ label, value }) {
+  const v = val(value)
+  return (
+    <>
+      <dt className="field-long-label">{label}</dt>
+      <dd className={v ? 'field-long' : 'field-long empty'}>{v || '—'}</dd>
+    </>
+  )
+}
+
 function parseTelefonos(value) {
   if (value == null || value === '') return []
   if (Array.isArray(value)) return value.map((t) => String(t).trim()).filter(Boolean)
@@ -237,10 +247,10 @@ export default function AvisoCard({ aviso, onMetaChange }) {
           <Field label="Modelo / KI" value={a.aparato?.modelo} copyable />
           <Field label="Tipo" value={a.aparato?.tipo} />
         </dl></div>
-        <div className="section"><h3>Datos de la avería</h3><dl>
-          <Field label="Causa" value={a.averia?.causa} />
-          <Field label="Síntoma" value={a.averia?.sintoma} />
-          <Field label="Diagnóstico" value={a.averia?.diagnostico} />
+        <div className="section section-averia"><h3>Datos de la avería</h3><dl>
+          <LongField label="Causa" value={a.averia?.causa} />
+          <LongField label="Síntoma" value={a.averia?.sintoma} />
+          <LongField label="Diagnóstico" value={a.averia?.diagnostico} />
         </dl></div>
         <div className="section"><h3>Seguro</h3><dl>
           <Field label="Compañía" value={a.seguro?.compania} />
