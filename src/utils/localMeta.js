@@ -65,3 +65,11 @@ export function setMeta(aviso, patch) {
   saveAll(all)
   return all[key]
 }
+
+export function deleteMeta(aviso) {
+  const all = loadAll()
+  const key = avisoKey(aviso)
+  if (!key || !(key in all)) return
+  delete all[key]
+  saveAll(all)
+}
