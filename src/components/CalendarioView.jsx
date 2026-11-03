@@ -20,7 +20,7 @@ import { val } from '../utils/parseAvisos'
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
-export default function CalendarioView({ avisos, metaTick, onSelectAviso, onMetaChange }) {
+export default function CalendarioView({ avisos, metaTick, onSelectAviso, onMetaChange, onDelete }) {
   const [modo, setModo] = useState('mes')
   const [anchor, setAnchor] = useState(() => startOfMonth(new Date()))
   const [diaSel, setDiaSel] = useState(() => toYMD(new Date()))
@@ -209,7 +209,22 @@ export default function CalendarioView({ avisos, metaTick, onSelectAviso, onMeta
                             {FRANJAS.map((f) => <option key={f} value={f}>{f}</option>)}
                           </select>
                           <span className={`estado-pill ${estadoClass(meta.estado)}`}>{meta.estado || 'Pendiente'}</span>
-                          <button type="button" className="btn-sm" onClick={() => quitarCita(a)} title="Quitar cita">Quitar</button>
+                          <button type="button" className="btn-sm" onClick={() => quitarCita(a)} title="Quitar cita del calendario">Quitar cita</button>
+                          {onDelete && (
+                            <button
+                              type="button"
+                              className="btn-sm btn-delete-aviso"
+                              onClick={() => {
+                                const label = a.aviso || a.orden || ''
+                                if (window.confirm(`¿Eliminar el aviso ${label}? Se quitará de la lista y del calendario.`)) {
+                                  onDelete(a)
+                                }
+                              }}
+                              title="Eliminar aviso"
+                            >
+                              Eliminar
+                            </button>
+                          )}
                         </div>
                       </div>
                     </li>
