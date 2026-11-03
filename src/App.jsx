@@ -6,7 +6,7 @@ import LoginScreen from './components/LoginScreen'
 import { useAuth } from './hooks/useAuth'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { DEMO_AVISOS } from './data/demoAvisos'
-import { getMeta, ESTADOS } from './utils/localMeta'
+import { getMeta, ESTADOS, deleteMeta, avisoKey } from './utils/localMeta'
 import { exportAvisosCsv } from './utils/exportCsv'
 import {
   listHistorial,
@@ -85,6 +85,17 @@ export default function App() {
   const borrarHistorial = (id, e) => {
     e.stopPropagation()
     setHistorial(deleteHistorialEntry(id))
+  }
+
+  const eliminarAviso = (aviso) => {
+    const key = avisoKey(aviso)
+    setAvisos((prev) => prev.filter((a) => avisoKey(a) !== key && a !== aviso))
+    deleteMeta(aviso)
+    setMetaTick((t) => t + 1)
+    setStatus({
+      msg: `Aviso ${aviso.aviso || aviso.orden || ''} eliminado.`,
+      type: 'success',
+    })
   }
 
   const procesarPdf = async () => {
@@ -276,6 +287,7 @@ export default function App() {
           avisos={avisos}
           metaTick={metaTick}
           onMetaChange={() => setMetaTick((t) => t + 1)}
+          onDelete={eliminarAviso}
           onSelectAviso={(a) => {
             setVista('lista')
             setScrollToAviso(String(a.aviso ?? a.orden))
@@ -292,7 +304,11 @@ export default function App() {
         ) : (
           avisosFiltrados.map((a, i) => (
             <div key={`${a.orden}-${a.aviso}-${i}`} id={`aviso-${a.aviso}`} className={scrollToAviso && String(a.aviso) === scrollToAviso ? 'aviso-highlight-wrap' : undefined}>
-              <AvisoCard aviso={a} onMetaChange={() => setMetaTick((t) => t + 1)} />
+              <AvisoCard
+                aviso={a}
+                onMetaChange={() => setMetaTick((t) => t + 1)}
+                onDelete={eliminarAviso}
+              />
             </div>
           ))
         )}
