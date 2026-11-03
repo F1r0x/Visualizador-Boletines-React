@@ -114,7 +114,7 @@ function FechaField({ label, value }) {
   return (<><dt>{label}</dt><dd className={cls}>{v || '—'}{badge}</dd></>)
 }
 
-export default function AvisoCard({ aviso, onMetaChange }) {
+export default function AvisoCard({ aviso, onMetaChange, onDelete }) {
   const a = aviso
   const initial = getMeta(a)
   const [estado, setEstado] = useState(initial.estado)
@@ -168,6 +168,21 @@ export default function AvisoCard({ aviso, onMetaChange }) {
             {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
           <button type="button" className="btn-wa" onClick={copiarWhatsApp}>{waOk ? '✓ Copiado' : 'WhatsApp'}</button>
+          {onDelete && (
+            <button
+              type="button"
+              className="btn-delete-aviso"
+              onClick={() => {
+                const label = a.aviso || a.orden || 'este aviso'
+                if (window.confirm(`¿Eliminar el aviso ${label}? Se quitará de la lista y del calendario.`)) {
+                  onDelete(a)
+                }
+              }}
+              title="Eliminar este aviso"
+            >
+              Eliminar
+            </button>
+          )}
         </div>
       </div>
 
