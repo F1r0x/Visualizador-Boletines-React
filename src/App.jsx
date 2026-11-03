@@ -275,6 +275,7 @@ export default function App() {
         <CalendarioView
           avisos={avisos}
           metaTick={metaTick}
+          onMetaChange={() => setMetaTick((t) => t + 1)}
           onSelectAviso={(a) => {
             setVista('lista')
             setScrollToAviso(String(a.aviso ?? a.orden))
