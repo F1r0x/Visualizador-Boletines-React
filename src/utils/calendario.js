@@ -10,9 +10,21 @@ export function startOfWeek(date = new Date()) {
   return d
 }
 
+export function startOfMonth(date = new Date()) {
+  const d = new Date(date.getFullYear(), date.getMonth(), 1)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
 export function addDays(date, n) {
   const d = new Date(date)
   d.setDate(d.getDate() + n)
+  return d
+}
+
+export function addMonths(date, n) {
+  const d = new Date(date.getFullYear(), date.getMonth() + n, 1)
+  d.setHours(0, 0, 0, 0)
   return d
 }
 
@@ -24,7 +36,11 @@ export function toYMD(date) {
 }
 
 export function formatDiaCorto(date) {
-  return date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+  return date.toLocaleDateString('es-ES', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
 }
 
 export function formatDiaLargo(date) {
@@ -33,6 +49,17 @@ export function formatDiaLargo(date) {
     day: 'numeric',
     month: 'long',
   })
+}
+
+export function formatMesAnio(date) {
+  const s = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+export function celdasDelMes(monthStart) {
+  const first = startOfMonth(monthStart)
+  const gridStart = startOfWeek(first)
+  return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
 }
 
 export function avisosDelDia(avisos, ymd) {
@@ -51,25 +78,71 @@ export function avisosDelDia(avisos, ymd) {
   return list
 }
 
-export function avisosPorSemana(avisos, weekStart) {
+export function avisosPorFechas(avisos, ymdList) {
+  const set = new Set(ymdList)
   const map = {}
-  for (let i = 0; i < 7; i++) {
-    map[toYMD(addDays(weekStart, i))] = []
-  }
+  ymdList.forEach((k) => {
+    map[k] = []
+  })
   avisos.forEach((a) => {
     const meta = getMeta(a)
-    if (meta.citaFecha && map[meta.citaFecha] !== undefined) {
+    if (meta.citaFecha && set.has(meta.citaFecha)) {
       map[meta.citaFecha].push({ aviso: a, meta })
     }
   })
   Object.keys(map).forEach((k) => {
-    map[k].sort((x, y) => (x.meta.citaHora || '99:99').localeCompare(y.meta.citaHora || '99:99'))
+    map[k].sort((x, y) =>
+      (x.meta.citaHora || '99:99').localeCompare(y.meta.citaHora || '99:99')
+    )
   })
   return map
+}
+
+export function avisosPorSemana(avisos, weekStart) {
+  const ymds = Array.from({ length: 7 }, (_, i) => toYMD(addDays(weekStart, i)))
+  return avisosPorFechas(avisos, ymds)
+}
+
+export function avisosSinCita(avisos) {
+  return avisos
+    .map((a) => ({ aviso: a, meta: getMeta(a) }))
+    .filter(({ meta }) => !meta.citaFecha)
+    .sort((x, y) => {
+      const ax = String(x.aviso.aviso || x.aviso.orden || '')
+      const ay = String(y.aviso.aviso || y.aviso.orden || '')
+      return ax.localeCompare(ay)
+    })
 }
 
 export function labelAvisoCorto(a) {
   const nombre = val(a.cliente?.nombre) || `Aviso ${a.aviso || a.orden}`
   const tipo = val(a.aparato?.tipo) || ''
   return tipo ? `${nombre} · ${tipo}` : nombre
+}
+
+export function mapsRutaUrl(items) {
+  const dirs = items
+    .map(({ aviso: a }) => {
+      const d = val(a.direccion?.completa)
+      const cp = val(a.direccion?.codigo_postal)
+      return [d, cp].filter(Boolean).join(', ')
+    })
+    .filter(Boolean)
+  if (!dirs.length) return null
+  if (dirs.length === 1) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dirs[0])}`
+  }
+  const origin = encodeURIComponent(dirs[0])
+  const destination = encodeURIComponent(dirs[dirs.length - 1])
+  const waypoints = dirs
+    .slice(1, -1)
+    .map((d) => encodeURIComponent(d))
+    .join('|')
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`
+  if (waypoints) url += `&waypoints=${waypoints}`
+  return url
+}
+
+export function estadoClass(estado) {
+  return 'est-' + String(estado || 'Pendiente').toLowerCase().replace(/\s+/g, '-')
 }
