@@ -12,7 +12,6 @@ export default defineConfig({
         'icons/apple-touch-icon.png',
         'icons/icon-192.png',
         'icons/icon-512.png',
-        'icons/icon.svg',
       ],
       manifest: {
         name: 'Boletines de Servicio',
@@ -56,13 +55,29 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api',
-              expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 },
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 48, maxAgeSeconds: 60 * 60 * 24 },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/n8n\./i,
+            handler: 'NetworkOnly',
+            options: { cacheName: 'n8n-network' },
+          },
+          {
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images',
+              expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
         ],
