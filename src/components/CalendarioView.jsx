@@ -46,6 +46,10 @@ function dowMon0(date) {
   return js === 0 ? 6 : js - 1
 }
 
+function avisoKeySafe(a) {
+  return String(a?.aviso ?? a?.orden ?? Math.random())
+}
+
 export default function CalendarioView({
   avisos,
   metaTick,
@@ -101,14 +105,13 @@ export default function CalendarioView({
     [avisos, diaSel, metaTick]
   )
 
-  const sinCita = useMemo(
-    () => avisosSinCita(avisos),
-    [avisos, metaTick]
-  )
+  const sinCita = useMemo(() => avisosSinCita(avisos), [avisos, metaTick])
 
   const totalCitados = useMemo(() => {
     let n = 0
-    Object.values(porDia).forEach((arr) => { n += arr.length })
+    Object.values(porDia).forEach((arr) => {
+      n += arr.length
+    })
     return n
   }, [porDia])
 
@@ -134,7 +137,7 @@ export default function CalendarioView({
     setDiaSel(ymd)
     setPopupTab('ruta')
     if (asignando) {
-      setMeta(asignando, { citaFecha: ymd })
+      setMeta(asignando, { citaFecha: ymd, citaOrigen: 'manual' })
       onMetaChange?.()
       setAsignando(null)
       setShowPopup(true)
@@ -154,18 +157,18 @@ export default function CalendarioView({
   }
 
   const asignarHora = (a, hora) => {
-    setMeta(a, { citaHora: hora })
+    setMeta(a, { citaHora: hora, citaOrigen: 'manual' })
     onMetaChange?.()
   }
 
   const asignarFranja = (a, franja) => {
     const v = franja === 'Sin franja' ? '' : franja
-    setMeta(a, { franja: v })
+    setMeta(a, { franja: v, citaOrigen: 'manual' })
     onMetaChange?.()
   }
 
   const quitarCita = (a) => {
-    setMeta(a, { citaFecha: '', citaHora: '', franja: '' })
+    setMeta(a, { citaFecha: '', citaHora: '', franja: '', citaOrigen: '' })
     onMetaChange?.()
   }
 
@@ -181,20 +184,64 @@ export default function CalendarioView({
     <div className="cal-wrap">
       <div className="cal-toolbar">
         <div className="cal-nav">
-          <button type="button" className="btn-sm" onClick={prev}>←</button>
-          <button type="button" className="btn-sm" onClick={irHoy}>Hoy</button>
-          <button type="button" className="btn-sm" onClick={next}>→</button>
+          <button type="button" className="btn-sm" onClick={prev}>
+            ←
+          </button>
+          <button type="button" className="btn-sm" onClick={irHoy}>
+            Hoy
+          </button>
+          <button type="button" className="btn-sm" onClick={next}>
+            →
+          </button>
           <span className="cal-range">{tituloNav}</span>
         </div>
         <div className="cal-modes">
-          <button type="button" className={modo === 'mes' ? 'btn-sm active' : 'btn-sm'} onClick={() => { setModo('mes'); setAnchor(startOfMonth(new Date(diaSel + 'T12:00:00'))) }}>Mes</button>
-          <button type="button" className={modo === 'semana' ? 'btn-sm active' : 'btn-sm'} onClick={() => { setModo('semana'); setAnchor(startOfWeek(new Date(diaSel + 'T12:00:00'))) }}>Semana</button>
-          <button type="button" className={showWorkCfg ? 'btn-sm active' : 'btn-sm'} onClick={() => setShowWorkCfg((v) => !v)} title="Días laborables">Días</button>
-          <button type="button" className="btn-sm" onClick={() => { setPopupTab('sin-cita'); setShowPopup(true) }}>Sin cita ({sinCita.length})</button>
+          <button
+            type="button"
+            className={modo === 'mes' ? 'btn-sm active' : 'btn-sm'}
+            onClick={() => {
+              setModo('mes')
+              setAnchor(startOfMonth(new Date(diaSel + 'T12:00:00')))
+            }}
+          >
+            Mes
+          </button>
+          <button
+            type="button"
+            className={modo === 'semana' ? 'btn-sm active' : 'btn-sm'}
+            onClick={() => {
+              setModo('semana')
+              setAnchor(startOfWeek(new Date(diaSel + 'T12:00:00')))
+            }}
+          >
+            Semana
+          </button>
+          <button
+            type="button"
+            className={showWorkCfg ? 'btn-sm active' : 'btn-sm'}
+            onClick={() => setShowWorkCfg((v) => !v)}
+            title="Días laborables"
+          >
+            Días
+          </button>
+          <button
+            type="button"
+            className="btn-sm"
+            onClick={() => {
+              setPopupTab('sin-cita')
+              setShowPopup(true)
+            }}
+          >
+            Sin cita ({sinCita.length})
+          </button>
         </div>
         <div className="cal-stats">
-          <span className="cal-stat"><strong>{totalCitados}</strong> citados</span>
-          <span className="cal-stat muted"><strong>{sinCita.length}</strong> sin cita</span>
+          <span className="cal-stat">
+            <strong>{totalCitados}</strong> citados
+          </span>
+          <span className="cal-stat muted">
+            <strong>{sinCita.length}</strong> sin cita
+          </span>
         </div>
       </div>
 
@@ -203,26 +250,45 @@ export default function CalendarioView({
           <span className="cal-work-label">Mostrar en el calendario:</span>
           {WEEKDAYS.map((w) => (
             <label key={w.id} className="cal-work-chip">
-              <input type="checkbox" checked={workSet.has(w.id)} onChange={() => toggleWorkDay(w.id)} />
+              <input
+                type="checkbox"
+                checked={workSet.has(w.id)}
+                onChange={() => toggleWorkDay(w.id)}
+              />
               {w.label}
             </label>
           ))}
-          <button type="button" className="btn-sm" onClick={() => setWorkDays(DEFAULT_WORK)}>L–V</button>
-          <button type="button" className="btn-sm" onClick={() => setWorkDays([0, 1, 2, 3, 4, 5, 6])}>Todos</button>
+          <button type="button" className="btn-sm" onClick={() => setWorkDays(DEFAULT_WORK)}>
+            L–V
+          </button>
+          <button
+            type="button"
+            className="btn-sm"
+            onClick={() => setWorkDays([0, 1, 2, 3, 4, 5, 6])}
+          >
+            Todos
+          </button>
         </div>
       )}
 
       {asignando && (
         <div className="cal-assign-banner">
           Elige un día para citar: <strong>{labelAvisoCorto(asignando)}</strong>
-          <button type="button" className="btn-sm" onClick={() => setAsignando(null)}>Cancelar</button>
+          <button type="button" className="btn-sm" onClick={() => setAsignando(null)}>
+            Cancelar
+          </button>
         </div>
       )}
 
       <div className={`cal-board full ${modo}`}>
-        <div className="cal-weekdays" style={{ gridTemplateColumns: `repeat(${nCols}, minmax(0, 1fr))` }}>
+        <div
+          className="cal-weekdays"
+          style={{ gridTemplateColumns: `repeat(${nCols}, minmax(0, 1fr))` }}
+        >
           {headers.map((w) => (
-            <div key={w.id} className="cal-wd">{w.label}</div>
+            <div key={w.id} className="cal-wd">
+              {w.label}
+            </div>
           ))}
         </div>
         <div
@@ -242,20 +308,46 @@ export default function CalendarioView({
               <button
                 key={ymd}
                 type="button"
-                className={['cal-day', isHoy ? 'hoy' : '', isSel ? 'sel' : '', fueraMes ? 'fuera' : '', items.length ? 'has-items' : '', asignando ? 'pickable' : ''].filter(Boolean).join(' ')}
+                className={[
+                  'cal-day',
+                  isHoy ? 'hoy' : '',
+                  isSel ? 'sel' : '',
+                  fueraMes ? 'fuera' : '',
+                  items.length ? 'has-items' : '',
+                  asignando ? 'pickable' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 onClick={() => clickDia(ymd)}
               >
                 <div className="cal-day-head">
                   <span className="cal-day-num">{d.getDate()}</span>
-                  {items.length > 0 && <span className="cal-day-badge">{items.length}</span>}
+                  {items.length > 0 && (
+                    <span className="cal-day-badge">{items.length}</span>
+                  )}
                 </div>
                 <ul className="cal-day-list">
                   {items.slice(0, maxChips).map(({ aviso: a, meta }) => (
                     <li
                       key={avisoKeySafe(a)}
-                      className={`cal-chip ${estadoClass(meta.estado)} ${meta.franja === 'Urgencia' ? 'urg' : ''}`}
-                      title={`${meta.citaHora ? meta.citaHora + ' · ' : ''}${labelAvisoCorto(a)}`}
+                      className={`cal-chip ${estadoClass(meta.estado)} ${
+                        meta.franja === 'Urgencia' ? 'urg' : ''
+                      } ${meta.citaOrigen === 'boletin' ? 'origen-boletin' : ''} ${
+                        meta.citaOrigen === 'manual' ? 'origen-manual' : ''
+                      }`}
+                      title={`${meta.citaHora ? meta.citaHora + ' · ' : ''}${labelAvisoCorto(a)}${
+                        meta.citaOrigen === 'boletin'
+                          ? ' · Hora del boletín'
+                          : meta.citaOrigen === 'manual'
+                            ? ' · Hora manual'
+                            : ''
+                      }`}
                     >
+                      {meta.citaOrigen === 'boletin' && (
+                        <span className="chip-origen" aria-hidden>
+                          📋
+                        </span>
+                      )}
                       {meta.citaHora && <em>{meta.citaHora}</em>}
                       {labelAvisoCorto(a)}
                     </li>
@@ -271,24 +363,53 @@ export default function CalendarioView({
       </div>
 
       {showPopup && (
-        <div className="cal-popup-overlay" onClick={() => setShowPopup(false)} role="presentation">
-          <div className="cal-popup" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div
+          className="cal-popup-overlay"
+          onClick={() => setShowPopup(false)}
+          role="presentation"
+        >
+          <div
+            className="cal-popup"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
             <div className="cal-popup-head">
               <div className="cal-side-tabs">
-                <button type="button" className={popupTab === 'ruta' ? 'btn-sm active' : 'btn-sm'} onClick={() => setPopupTab('ruta')}>
+                <button
+                  type="button"
+                  className={popupTab === 'ruta' ? 'btn-sm active' : 'btn-sm'}
+                  onClick={() => setPopupTab('ruta')}
+                >
                   {formatDiaLargo(new Date(diaSel + 'T12:00:00'))}
                 </button>
-                <button type="button" className={popupTab === 'sin-cita' ? 'btn-sm active' : 'btn-sm'} onClick={() => setPopupTab('sin-cita')}>
+                <button
+                  type="button"
+                  className={popupTab === 'sin-cita' ? 'btn-sm active' : 'btn-sm'}
+                  onClick={() => setPopupTab('sin-cita')}
+                >
                   Sin cita ({sinCita.length})
                 </button>
               </div>
-              <button type="button" className="btn-sm" onClick={() => setShowPopup(false)} title="Cerrar">✕</button>
+              <button
+                type="button"
+                className="btn-sm"
+                onClick={() => setShowPopup(false)}
+                title="Cerrar"
+              >
+                ✕
+              </button>
             </div>
 
             {popupTab === 'ruta' && (
               <div className="cal-ruta">
                 {delDia.length > 0 && rutaMaps && (
-                  <a className="btn-sm cal-maps-btn" href={rutaMaps} target="_blank" rel="noopener noreferrer">
+                  <a
+                    className="btn-sm cal-maps-btn"
+                    href={rutaMaps}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Abrir ruta en Maps ({delDia.length})
                   </a>
                 )}
@@ -303,20 +424,47 @@ export default function CalendarioView({
                       <li key={avisoKeySafe(a)} className="ruta-item">
                         <span className="ruta-num">{idx + 1}</span>
                         <div className="ruta-body">
-                          <button type="button" className="ruta-title" onClick={() => { setShowPopup(false); onSelectAviso?.(a) }}>
+                          <button
+                            type="button"
+                            className="ruta-title"
+                            onClick={() => {
+                              setShowPopup(false)
+                              onSelectAviso?.(a)
+                            }}
+                          >
                             {labelAvisoCorto(a)}
+                            {meta.citaOrigen === 'boletin' && (
+                              <span className="cita-origen boletin"> 📋</span>
+                            )}
                           </button>
                           <div className="ruta-meta">
-                            {[val(a.direccion?.completa), val(a.direccion?.codigo_postal)].filter(Boolean).join(' · ') || 'Sin dirección'}
+                            {[val(a.direccion?.completa), val(a.direccion?.codigo_postal)]
+                              .filter(Boolean)
+                              .join(' · ') || 'Sin dirección'}
                             {val(a.aparato?.marca) && ` · ${val(a.aparato.marca)}`}
                           </div>
                           <div className="ruta-controls">
-                            <input type="time" value={meta.citaHora || ''} onChange={(e) => asignarHora(a, e.target.value)} />
-                            <select value={meta.franja || 'Sin franja'} onChange={(e) => asignarFranja(a, e.target.value)}>
-                              {FRANJAS.map((f) => <option key={f} value={f}>{f}</option>)}
+                            <input
+                              type="time"
+                              value={meta.citaHora || ''}
+                              onChange={(e) => asignarHora(a, e.target.value)}
+                            />
+                            <select
+                              value={meta.franja || 'Sin franja'}
+                              onChange={(e) => asignarFranja(a, e.target.value)}
+                            >
+                              {FRANJAS.map((f) => (
+                                <option key={f} value={f}>
+                                  {f}
+                                </option>
+                              ))}
                             </select>
-                            <span className={`estado-pill ${estadoClass(meta.estado)}`}>{meta.estado || 'Pendiente'}</span>
-                            <button type="button" className="btn-sm" onClick={() => quitarCita(a)}>Quitar cita</button>
+                            <span className={`estado-pill ${estadoClass(meta.estado)}`}>
+                              {meta.estado || 'Pendiente'}
+                            </span>
+                            <button type="button" className="btn-sm" onClick={() => quitarCita(a)}>
+                              Quitar cita
+                            </button>
                             {onDelete && (
                               <button
                                 type="button"
@@ -340,7 +488,9 @@ export default function CalendarioView({
 
             {popupTab === 'sin-cita' && (
               <div className="cal-ruta">
-                <p className="cal-hint">Pulsa <strong>Citar</strong>, cierra y elige un día en el calendario.</p>
+                <p className="cal-hint">
+                  Pulsa <strong>Citar</strong>, cierra y elige un día en el calendario.
+                </p>
                 {sinCita.length === 0 ? (
                   <p className="hist-empty">Todos los avisos tienen cita.</p>
                 ) : (
@@ -348,16 +498,34 @@ export default function CalendarioView({
                     {sinCita.map(({ aviso: a, meta }) => (
                       <li key={avisoKeySafe(a)}>
                         <div>
-                          <button type="button" className="ruta-title" onClick={() => { setShowPopup(false); onSelectAviso?.(a) }}>
+                          <button
+                            type="button"
+                            className="ruta-title"
+                            onClick={() => {
+                              setShowPopup(false)
+                              onSelectAviso?.(a)
+                            }}
+                          >
                             {labelAvisoCorto(a)}
                           </button>
                           <div className="ruta-meta">
                             {val(a.direccion?.codigo_postal) || '—'}
                             {val(a.aparato?.tipo) && ` · ${val(a.aparato.tipo)}`}
-                            <span className={`estado-pill ${estadoClass(meta.estado)}`}>{meta.estado}</span>
+                            <span className={`estado-pill ${estadoClass(meta.estado)}`}>
+                              {meta.estado}
+                            </span>
                           </div>
                         </div>
-                        <button type="button" className="btn-sm active" onClick={() => { setAsignando(a); setShowPopup(false) }}>Citar</button>
+                        <button
+                          type="button"
+                          className="btn-sm active"
+                          onClick={() => {
+                            setAsignando(a)
+                            setShowPopup(false)
+                          }}
+                        >
+                          Citar
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -369,8 +537,4 @@ export default function CalendarioView({
       )}
     </div>
   )
-}
-
-function avisoKeySafe(a) {
-  return String(a?.aviso ?? a?.orden ?? Math.random())
 }
