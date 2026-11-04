@@ -5,6 +5,7 @@ import CloudPanel from './components/CloudPanel'
 import LoginScreen from './components/LoginScreen'
 import { useAuth } from './hooks/useAuth'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
+import { aplicarCitasDesdeHorario } from './utils/citasDesdeHorario'
 import { DEMO_AVISOS } from './data/demoAvisos'
 import { getMeta, ESTADOS, deleteMeta, avisoKey } from './utils/localMeta'
 import { exportAvisosCsv } from './utils/exportCsv'
@@ -51,7 +52,9 @@ export default function App() {
     setHistorial(hist)
     if (hist.length > 0) {
       const ultimo = hist[0]
-      setAvisos(ultimo.avisos || [])
+      let lista = ultimo.avisos || []
+      lista = aplicarCitasDesdeHorario(lista)
+      setAvisos(lista)
       setStatus({
         msg: `Cargados avisos anteriores: ${ultimo.nombre} (${ultimo.count} avisos).`,
         type: 'success',
@@ -88,7 +91,10 @@ export default function App() {
   }
 
   const cargarHistorial = (entry) => {
-    setAvisos(entry.avisos || [])
+    let lista = entry.avisos || []
+    lista = aplicarCitasDesdeHorario(lista)
+    setAvisos(lista)
+    setMetaTick((t) => t + 1)
     setShowHist(false)
     setStatus({ msg: `Cargado del historial: ${entry.nombre} (${entry.count} avisos).`, type: 'success' })
   }
@@ -130,10 +136,16 @@ export default function App() {
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText} - ${rawText.slice(0, 200)}`)
       let data
       try { data = JSON.parse(rawText) } catch { throw new Error('La respuesta no es JSON valido: ' + rawText.slice(0, 150)) }
-      const lista = normalizarRespuestaN8n(data)
+      let lista = normalizarRespuestaN8n(data)
+      lista = aplicarCitasDesdeHorario(lista)
       setAvisos(lista)
+      setMetaTick((t) => t + 1)
       guardarEnHistorial(lista, file?.name || 'Boletin PDF')
-      setStatus({ msg: `PDF procesado correctamente. ${lista.length} avisos recibidos.`, type: 'success' })
+      const conHora = lista.filter((a) => a.horario).length
+      setStatus({
+        msg: `PDF procesado: ${lista.length} avisos${conHora ? ` · ${conHora} con horario del boletin` : ''}.`,
+        type: 'success',
+      })
     } catch (err) {
       console.error(err)
       setStatus({ msg: `Error: ${err.message}`, type: 'error' })
@@ -229,7 +241,7 @@ export default function App() {
           <CloudPanel
             avisos={avisos}
             onLoadAvisos={(lista) => {
-              setAvisos(lista)
+              setAvisos(aplicarCitasDesdeHorario(lista))
               setMetaTick((t) => t + 1)
               setShowCloud(false)
               setVista('lista')
