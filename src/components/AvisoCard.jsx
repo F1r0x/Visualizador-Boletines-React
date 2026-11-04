@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { val, mapsUrl } from '../utils/parseAvisos'
+import { val, mapsUrl, parseHorarioBoletin } from '../utils/parseAvisos'
 import { ESTADOS, CHECKLIST_ITEMS, FRANJAS, getMeta, setMeta } from '../utils/localMeta'
 import { plantillaWhatsApp } from '../utils/whatsapp'
 import { urgenciaFecha, formatoDuracion } from '../utils/fechas'
@@ -129,14 +129,24 @@ export default function AvisoCard({ aviso, onMetaChange, onDelete }) {
   const [franja, setFranja] = useState(initial.franja || '')
   const [waOk, setWaOk] = useState(false)
 
+  const persist = (patch) => { setMeta(a, patch); onMetaChange?.() }
+
   useEffect(() => {
     const m = getMeta(a)
     setEstado(m.estado); setNota(m.nota); setChecklist(m.checklist || {})
     setInicioVisita(m.inicioVisita || ''); setFinVisita(m.finVisita || ''); setPiezas(m.piezas || [])
-    setCitaFecha(m.citaFecha || ''); setCitaHora(m.citaHora || ''); setFranja(m.franja || '')
-  }, [a.aviso, a.orden])
-
-  const persist = (patch) => { setMeta(a, patch); onMetaChange?.() }
+    setCitaFecha(m.citaFecha || ''); setFranja(m.franja || '')
+    const delBoletin = parseHorarioBoletin(a.horario)
+    if (m.citaHora) {
+      setCitaHora(m.citaHora)
+    } else if (delBoletin.inicio) {
+      setCitaHora(delBoletin.inicio)
+      setMeta(a, { citaHora: delBoletin.inicio })
+      onMetaChange?.()
+    } else {
+      setCitaHora('')
+    }
+  }, [a.aviso, a.orden, a.horario])
 
   const cambiarEstado = (e) => { const v = e.target.value; setEstado(v); persist({ estado: v }) }
   const guardarNota = (e) => { const v = e.target.value; setNota(v); persist({ nota: v }) }
@@ -193,6 +203,9 @@ export default function AvisoCard({ aviso, onMetaChange, onDelete }) {
 
       <div className="aviso-cita">
         <h4>Cita planificada</h4>
+        {val(a.horario) && (
+          <p className="horario-boletin">Horario del boletín: <strong>{val(a.horario)}</strong></p>
+        )}
         <div className="cita-row">
           <input type="date" value={citaFecha} onChange={(e) => { const v = e.target.value; setCitaFecha(v); persist({ citaFecha: v }) }} title="Fecha de la cita" />
           <input type="time" value={citaHora} onChange={(e) => { const v = e.target.value; setCitaHora(v); persist({ citaHora: v }) }} title="Hora aproximada" />
@@ -274,6 +287,7 @@ export default function AvisoCard({ aviso, onMetaChange, onDelete }) {
           <Field label="Urgencia" value={a.seguro?.tipo_urgencia} />
         </dl></div>
         <div className="section"><h3>Fechas y otros</h3><dl>
+          <Field label="Horario boletín" value={a.horario} />
           <FechaField label="Límite 1ª visita" value={a.fechas?.limite_primera_visita} />
           <FechaField label="Límite terminación" value={a.fechas?.limite_terminacion} />
           <Field label="Tienda solicitante" value={a.tienda_solicitante} />
