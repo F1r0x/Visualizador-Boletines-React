@@ -53,7 +53,10 @@ export default function App() {
     if (hist.length > 0) {
       const ultimo = hist[0]
       let lista = ultimo.avisos || []
-      lista = aplicarCitasDesdeHorario(lista, { forzar: true })
+      lista = aplicarCitasDesdeHorario(lista, {
+        forzar: true,
+        nombreArchivo: ultimo.nombre || '',
+      })
       setAvisos(lista)
       setMetaTick((t) => t + 1)
       setStatus({
@@ -93,7 +96,10 @@ export default function App() {
 
   const cargarHistorial = (entry) => {
     let lista = entry.avisos || []
-    lista = aplicarCitasDesdeHorario(lista, { forzar: true })
+    lista = aplicarCitasDesdeHorario(lista, {
+      forzar: true,
+      nombreArchivo: entry.nombre || '',
+    })
     setAvisos(lista)
     setMetaTick((t) => t + 1)
     setShowHist(false)
@@ -138,13 +144,25 @@ export default function App() {
       let data
       try { data = JSON.parse(rawText) } catch { throw new Error('La respuesta no es JSON valido: ' + rawText.slice(0, 150)) }
       let lista = normalizarRespuestaN8n(data)
-      lista = aplicarCitasDesdeHorario(lista, { forzar: true })
+      const nombrePdf = file?.name || ''
+      lista = aplicarCitasDesdeHorario(lista, {
+        forzar: true,
+        nombreArchivo: nombrePdf,
+      })
+      const m = nombrePdf.match(/(0?[1-9]|[12]\d|3[01])[-_.](0?[1-9]|1[0-2])[-_.](20\d{2})/)
+      const diaMsg = m
+        ? `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}`
+        : (lista.find((a) => a.fecha_encabezado)?.fecha_encabezado || '')
+            .toString()
+            .split('-')
+            .reverse()
+            .join('/')
       setAvisos(lista)
       setMetaTick((t) => t + 1)
-      guardarEnHistorial(lista, file?.name || 'Boletin PDF')
+      guardarEnHistorial(lista, nombrePdf || 'Boletin PDF')
       const conHora = lista.filter((a) => a.horario).length
       setStatus({
-        msg: `PDF procesado: ${lista.length} avisos${conHora ? ` · ${conHora} con horario del boletin` : ''}.`,
+        msg: `PDF procesado: ${lista.length} avisos${conHora ? ` · ${conHora} con horario` : ''}${diaMsg ? ` · agenda ${diaMsg}` : ''}.`,
         type: 'success',
       })
     } catch (err) {
