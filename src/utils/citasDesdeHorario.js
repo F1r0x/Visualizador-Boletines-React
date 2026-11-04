@@ -12,6 +12,16 @@ export function parseFechaBoletin(raw) {
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
+/** "Agenda-800390-05-11-2026.pdf" → "2026-11-05" */
+export function parseFechaDesdeNombre(nombre) {
+  if (!nombre) return ''
+  const m = String(nombre).match(
+    /(0?[1-9]|[12]\d|3[01])[-_.](0?[1-9]|1[0-2])[-_.](20\d{2})/
+  )
+  if (!m) return ''
+  return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+}
+
 function addMinutes(hhmm, mins) {
   const [h, m] = hhmm.split(':').map(Number)
   const total = h * 60 + m + mins
@@ -31,14 +41,13 @@ function hoyYmd() {
   return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
 }
 
-/** Fecha de agenda del PDF (cabecera Fecha:04-11-2026) */
-export function fechaAgendaDelLote(avisos) {
-  for (const a of avisos) {
+export function fechaAgendaDelLote(avisos, nombreArchivo = '') {
+  for (const a of avisos || []) {
     const f =
       parseFechaBoletin(a.fecha_encabezado) || parseFechaBoletin(a.fecha)
     if (f) return f
   }
-  return ''
+  return parseFechaDesdeNombre(nombreArchivo)
 }
 
 export function extraerHorarioDeTexto(texto) {
@@ -49,16 +58,16 @@ export function extraerHorarioDeTexto(texto) {
   return m ? m[1].trim() : ''
 }
 
-/**
- * Al cargar un boletín:
- * - TODOS → citaFecha = día de la agenda del PDF
- * - Con HORAS → citaHora + citaOrigen: 'boletin' (preferente)
- * - Varios en misma franja → reparte horas
- */
-export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
+export function aplicarCitasDesdeHorario(
+  avisos,
+  { forzar = false, nombreArchivo = '', fechaAgendaForzada = '' } = {}
+) {
   if (!Array.isArray(avisos) || !avisos.length) return avisos
 
-  const fechaAgenda = fechaAgendaDelLote(avisos) || hoyYmd()
+  const fechaAgenda =
+    parseFechaBoletin(fechaAgendaForzada) ||
+    fechaAgendaDelLote(avisos, nombreArchivo) ||
+    hoyYmd()
 
   const lista = avisos.map((a) => {
     let horario = limpiarCampo(a.horario)
@@ -96,7 +105,6 @@ export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
 
     items.forEach(({ a }, i) => {
       const meta = getMeta(a)
-      // Respetar citas manuales del técnico (salvo forzar = PDF nuevo)
       if (!forzar && meta.citaOrigen === 'manual' && meta.citaFecha) return
 
       const hora = i === 0 ? inicio : addMinutes(inicio, step * i)
@@ -108,7 +116,6 @@ export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
     })
   })
 
-  // Sin HORAS: solo día de la agenda
   sinHora.forEach((a) => {
     const meta = getMeta(a)
     if (!forzar && meta.citaOrigen === 'manual' && meta.citaFecha) return
