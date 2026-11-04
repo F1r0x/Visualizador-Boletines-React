@@ -26,6 +26,21 @@ function minutesBetween(a, b) {
   return h2 * 60 + m2 - (h1 * 60 + m1)
 }
 
+function hoyYmd() {
+  const hoy = new Date()
+  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+}
+
+function fechaPreferida(a, meta) {
+  return (
+    parseFechaBoletin(a.fechas?.limite_primera_visita) ||
+    parseFechaBoletin(a.fecha_encabezado) ||
+    parseFechaBoletin(a.fecha_creacion) ||
+    meta.citaFecha ||
+    hoyYmd()
+  )
+}
+
 export function extraerHorarioDeTexto(texto) {
   if (!texto) return ''
   const m = String(texto).match(
@@ -42,13 +57,18 @@ export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
     if (!horario && a.texto_original) {
       horario = extraerHorarioDeTexto(a.texto_original)
     }
-    return horario ? { ...a, horario } : a
+    return horario ? { ...a, horario } : { ...a, horario: horario || a.horario || '' }
   })
 
   const grupos = new Map()
+  const sinHora = []
+
   lista.forEach((a, idx) => {
     const h = parseHorarioBoletin(a.horario)
-    if (!h.inicio) return
+    if (!h.inicio) {
+      sinHora.push(a)
+      return
+    }
     const key = h.texto || h.inicio
     if (!grupos.has(key)) grupos.set(key, [])
     grupos.get(key).push({ a, idx, h })
@@ -67,20 +87,25 @@ export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
       if (!forzar && meta.citaHora && meta.citaFecha) return
 
       const hora = i === 0 ? inicio : addMinutes(inicio, step * i)
-      const hoy = new Date()
-      const hoyYmd = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
-      const fecha =
-        parseFechaBoletin(a.fechas?.limite_primera_visita) ||
-        parseFechaBoletin(a.fecha_encabezado) ||
-        parseFechaBoletin(a.fecha_creacion) ||
-        meta.citaFecha ||
-        hoyYmd
+      const fecha = fechaPreferida(a, meta)
 
       const patch = {}
       if (forzar || !meta.citaHora) patch.citaHora = hora
       if (forzar || !meta.citaFecha) patch.citaFecha = fecha
       if (Object.keys(patch).length) setMeta(a, patch)
     })
+  })
+
+  sinHora.forEach((a) => {
+    const meta = getMeta(a)
+    if (!forzar && meta.citaFecha) return
+    const fecha =
+      parseFechaBoletin(a.fechas?.limite_primera_visita) ||
+      parseFechaBoletin(a.fecha_encabezado) ||
+      ''
+    if (fecha && (forzar || !meta.citaFecha)) {
+      setMeta(a, { citaFecha: fecha })
+    }
   })
 
   return lista
