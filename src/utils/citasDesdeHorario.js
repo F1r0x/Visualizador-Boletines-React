@@ -33,9 +33,9 @@ function hoyYmd() {
 
 function fechaPreferida(a, meta) {
   return (
-    parseFechaBoletin(a.fechas?.limite_primera_visita) ||
     parseFechaBoletin(a.fecha_encabezado) ||
     parseFechaBoletin(a.fecha_creacion) ||
+    parseFechaBoletin(a.fechas?.limite_primera_visita) ||
     meta.citaFecha ||
     hoyYmd()
   )
@@ -52,12 +52,21 @@ export function extraerHorarioDeTexto(texto) {
 export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
   if (!Array.isArray(avisos) || !avisos.length) return avisos
 
+  const fechaAgenda =
+    avisos.map((a) => parseFechaBoletin(a.fecha_encabezado)).find(Boolean) || ''
+
   const lista = avisos.map((a) => {
     let horario = limpiarCampo(a.horario)
     if (!horario && a.texto_original) {
       horario = extraerHorarioDeTexto(a.texto_original)
     }
-    return horario ? { ...a, horario } : { ...a, horario: horario || a.horario || '' }
+    const fecha_encabezado =
+      limpiarCampo(a.fecha_encabezado) || fechaAgenda || a.fecha_encabezado || ''
+    return {
+      ...a,
+      horario: horario || a.horario || '',
+      fecha_encabezado,
+    }
   })
 
   const grupos = new Map()
@@ -100,8 +109,8 @@ export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
     const meta = getMeta(a)
     if (!forzar && meta.citaFecha) return
     const fecha =
-      parseFechaBoletin(a.fechas?.limite_primera_visita) ||
       parseFechaBoletin(a.fecha_encabezado) ||
+      parseFechaBoletin(a.fechas?.limite_primera_visita) ||
       ''
     if (fecha && (forzar || !meta.citaFecha)) {
       setMeta(a, { citaFecha: fecha })
