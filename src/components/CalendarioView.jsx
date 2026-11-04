@@ -177,8 +177,9 @@ export default function CalendarioView({
       ? formatMesAnio(monthStart)
       : `${formatDiaLargo(weekStart)} – ${addDays(weekStart, 6).getDate()}`
 
-  const maxChips = modo === 'semana' ? 6 : nCols <= 5 ? 4 : 3
-  const rowH = modo === 'semana' ? 180 : nCols <= 5 ? 118 : 96
+  // Semana: todos los avisos. Mes: límite de chips.
+  const maxChips = modo === 'semana' ? 999 : nCols <= 5 ? 4 : 3
+  const rowH = modo === 'semana' ? null : nCols <= 5 ? 118 : 96
 
   return (
     <div className="cal-wrap">
@@ -280,7 +281,9 @@ export default function CalendarioView({
         </div>
       )}
 
-      <div className={`cal-board full ${modo}`}>
+      <div
+        className={`cal-board full ${modo}${modo === 'semana' ? ' week-expand' : ''}`}
+      >
         <div
           className="cal-weekdays"
           style={{ gridTemplateColumns: `repeat(${nCols}, minmax(0, 1fr))` }}
@@ -295,7 +298,9 @@ export default function CalendarioView({
           className={`cal-grid ${modo === 'semana' ? 'week' : 'month'}`}
           style={{
             gridTemplateColumns: `repeat(${nCols}, minmax(0, 1fr))`,
-            gridAutoRows: `${rowH}px`,
+            ...(modo === 'semana'
+              ? { gridAutoRows: 'minmax(160px, auto)' }
+              : { gridAutoRows: `${rowH}px` }),
           }}
         >
           {celdas.map((d) => {
@@ -352,7 +357,7 @@ export default function CalendarioView({
                       {labelAvisoCorto(a)}
                     </li>
                   ))}
-                  {items.length > maxChips && (
+                  {modo !== 'semana' && items.length > maxChips && (
                     <li className="more">+{items.length - maxChips}</li>
                   )}
                 </ul>
