@@ -53,8 +53,9 @@ export default function App() {
     if (hist.length > 0) {
       const ultimo = hist[0]
       let lista = ultimo.avisos || []
-      lista = aplicarCitasDesdeHorario(lista)
+      lista = aplicarCitasDesdeHorario(lista, { forzar: true })
       setAvisos(lista)
+      setMetaTick((t) => t + 1)
       setStatus({
         msg: `Cargados avisos anteriores: ${ultimo.nombre} (${ultimo.count} avisos).`,
         type: 'success',
@@ -92,7 +93,7 @@ export default function App() {
 
   const cargarHistorial = (entry) => {
     let lista = entry.avisos || []
-    lista = aplicarCitasDesdeHorario(lista)
+    lista = aplicarCitasDesdeHorario(lista, { forzar: true })
     setAvisos(lista)
     setMetaTick((t) => t + 1)
     setShowHist(false)
@@ -137,7 +138,7 @@ export default function App() {
       let data
       try { data = JSON.parse(rawText) } catch { throw new Error('La respuesta no es JSON valido: ' + rawText.slice(0, 150)) }
       let lista = normalizarRespuestaN8n(data)
-      lista = aplicarCitasDesdeHorario(lista)
+      lista = aplicarCitasDesdeHorario(lista, { forzar: true })
       setAvisos(lista)
       setMetaTick((t) => t + 1)
       guardarEnHistorial(lista, file?.name || 'Boletin PDF')
@@ -241,7 +242,7 @@ export default function App() {
           <CloudPanel
             avisos={avisos}
             onLoadAvisos={(lista) => {
-              setAvisos(aplicarCitasDesdeHorario(lista))
+              setAvisos(aplicarCitasDesdeHorario(lista, { forzar: true }))
               setMetaTick((t) => t + 1)
               setShowCloud(false)
               setVista('lista')
