@@ -4,6 +4,7 @@ import CalendarioView from './components/CalendarioView'
 import CloudPanel from './components/CloudPanel'
 import LoginScreen from './components/LoginScreen'
 import RemindersBanner from './components/RemindersBanner'
+import OfflineBanner from './components/OfflineBanner'
 import { useAuth } from './hooks/useAuth'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { aplicarCitasDesdeHorario } from './utils/citasDesdeHorario'
@@ -16,6 +17,12 @@ import {
   mergeAvisosParaCalendario,
   removeAvisoFromHistorial,
 } from './utils/historial'
+import {
+  guardarCacheOffline,
+  cargarCacheOffline,
+  aplicarMetaDesdeCache,
+  isOnline,
+} from './utils/offlineCache'
 
 const WEBHOOK_URL = 'https://n8n.automatizatutrabajo.com/webhook/boletines'
 
@@ -67,6 +74,20 @@ export default function App() {
         msg: `Cargados avisos anteriores: ${ultimo.nombre} (${ultimo.count} avisos).`,
         type: 'success',
       })
+    }
+  }, [])
+
+  // Si arrancamos offline y no hay avisos, restaurar caché
+  useEffect(() => {
+    if (!isOnline() && avisos.length === 0) {
+      const cache = cargarCacheOffline()
+      if (cache?.avisos?.length) {
+        setAvisos(aplicarMetaDesdeCache(cache.avisos))
+        setStatus({
+          msg: `Modo offline: ${cache.avisos.length} avisos desde caché (${cache.fechaAgenda || 'guardados'}).`,
+          type: 'success',
+        })
+      }
     }
   }, [])
 
@@ -132,7 +153,21 @@ export default function App() {
     [avisos, historial]
   )
 
+  // Snapshot offline (citas de hoy o lote actual)
+  useEffect(() => {
+    if (avisosCalendario.length > 0) {
+      guardarCacheOffline(avisosCalendario)
+    }
+  }, [avisosCalendario, metaTick])
+
   const procesarPdf = async () => {
+    if (!isOnline()) {
+      setStatus({
+        msg: 'Sin conexión: no se puede enviar el PDF. Revisa los avisos en caché offline.',
+        type: 'error',
+      })
+      return
+    }
     if (!file) {
       setStatus({ msg: 'Selecciona un archivo PDF primero.', type: 'error' })
       return
@@ -292,6 +327,8 @@ export default function App() {
           )}
         </div>
       </header>
+
+      <OfflineBanner />
 
       <div className="controls">
         <div
@@ -470,7 +507,7 @@ export default function App() {
         )}
       </div>
 
-      <footer>React + Vite · n8n · Login Supabase</footer>
+      <footer>React + Vite · n8n · Login Supabase · Offline PWA</footer>
     </div>
   )
 }
