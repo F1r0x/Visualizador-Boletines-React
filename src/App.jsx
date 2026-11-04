@@ -6,7 +6,6 @@ import LoginScreen from './components/LoginScreen'
 import { useAuth } from './hooks/useAuth'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { aplicarCitasDesdeHorario } from './utils/citasDesdeHorario'
-import { DEMO_AVISOS } from './data/demoAvisos'
 import { getMeta, ESTADOS, deleteMeta, avisoKey } from './utils/localMeta'
 import { exportAvisosCsv } from './utils/exportCsv'
 import {
@@ -93,15 +92,6 @@ export default function App() {
     setDragOver(false)
     const f = e.dataTransfer.files?.[0]
     if (f) setFileSafe(f)
-  }
-
-  const cargarDemo = () => {
-    setAvisos(DEMO_AVISOS)
-    guardarEnHistorial(DEMO_AVISOS, 'Datos de ejemplo')
-    setStatus({
-      msg: `Mostrando ${DEMO_AVISOS.length} avisos de ejemplo.`,
-      type: 'success',
-    })
   }
 
   const cargarHistorial = (entry) => {
@@ -369,9 +359,6 @@ export default function App() {
           <button className="btn" onClick={procesarPdf} disabled={loading || !file}>
             Procesar PDF
           </button>
-          <button className="btn btn-secondary" onClick={cargarDemo}>
-            Cargar datos de ejemplo
-          </button>
           <button className="btn btn-secondary" onClick={() => setShowHist((v) => !v)}>
             Historial ({historial.length})
           </button>
@@ -587,7 +574,7 @@ export default function App() {
             <p>
               Selecciona un PDF y pulsa <strong>Procesar PDF</strong>
               <br />
-              o abre el <strong>Historial</strong> / datos de ejemplo.
+              o abre el <strong>Historial</strong> de boletines anteriores.
               <br />
               El calendario une las citas de todos los boletines guardados.
             </p>
