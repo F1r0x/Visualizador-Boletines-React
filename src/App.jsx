@@ -39,6 +39,10 @@ export default function App() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroMarca, setFiltroMarca] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
+  const [filtroCp, setFiltroCp] = useState('')
+  const [filtroUrgencia, setFiltroUrgencia] = useState('')
+  const [filtroHorario, setFiltroHorario] = useState('')
+  const [filtroCita, setFiltroCita] = useState('')
   const [metaTick, setMetaTick] = useState(0)
   const [historial, setHistorial] = useState([])
   const [showHist, setShowHist] = useState(false)
@@ -78,7 +82,10 @@ export default function App() {
       return
     }
     setFile(f)
-    setStatus({ msg: `PDF listo: ${f.name} (${(f.size / 1024).toFixed(1)} KB)`, type: 'success' })
+    setStatus({
+      msg: `PDF listo: ${f.name} (${(f.size / 1024).toFixed(1)} KB)`,
+      type: 'success',
+    })
   }, [])
 
   const onDrop = (e) => {
@@ -91,7 +98,10 @@ export default function App() {
   const cargarDemo = () => {
     setAvisos(DEMO_AVISOS)
     guardarEnHistorial(DEMO_AVISOS, 'Datos de ejemplo')
-    setStatus({ msg: `Mostrando ${DEMO_AVISOS.length} avisos de ejemplo.`, type: 'success' })
+    setStatus({
+      msg: `Mostrando ${DEMO_AVISOS.length} avisos de ejemplo.`,
+      type: 'success',
+    })
   }
 
   const cargarHistorial = (entry) => {
@@ -103,7 +113,10 @@ export default function App() {
     setAvisos(lista)
     setMetaTick((t) => t + 1)
     setShowHist(false)
-    setStatus({ msg: `Cargado del historial: ${entry.nombre} (${entry.count} avisos).`, type: 'success' })
+    setStatus({
+      msg: `Cargado del historial: ${entry.nombre} (${entry.count} avisos).`,
+      type: 'success',
+    })
   }
 
   const borrarHistorial = (id, e) => {
@@ -140,9 +153,15 @@ export default function App() {
       formData.append('data', file, file.name)
       const res = await fetch(WEBHOOK_URL, { method: 'POST', body: formData })
       const rawText = await res.text()
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText} - ${rawText.slice(0, 200)}`)
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText} - ${rawText.slice(0, 200)}`)
+      }
       let data
-      try { data = JSON.parse(rawText) } catch { throw new Error('La respuesta no es JSON valido: ' + rawText.slice(0, 150)) }
+      try {
+        data = JSON.parse(rawText)
+      } catch {
+        throw new Error('La respuesta no es JSON valido: ' + rawText.slice(0, 150))
+      }
       let lista = normalizarRespuestaN8n(data)
       const nombrePdf = file?.name || ''
       lista = aplicarCitasDesdeHorario(lista, {
@@ -162,7 +181,9 @@ export default function App() {
       guardarEnHistorial(lista, nombrePdf || 'Boletin PDF')
       const conHora = lista.filter((a) => a.horario).length
       setStatus({
-        msg: `PDF procesado: ${lista.length} avisos${conHora ? ` · ${conHora} con horario` : ''}${diaMsg ? ` · agenda ${diaMsg}` : ''}.`,
+        msg: `PDF procesado: ${lista.length} avisos${
+          conHora ? ` · ${conHora} con horario` : ''
+        }${diaMsg ? ` · agenda ${diaMsg}` : ''}.`,
         type: 'success',
       })
     } catch (err) {
@@ -175,9 +196,50 @@ export default function App() {
 
   const marcasDisponibles = useMemo(() => {
     const set = new Set()
-    avisos.forEach((a) => { const m = val(a.aparato?.marca); if (m) set.add(m) })
+    avisos.forEach((a) => {
+      const m = val(a.aparato?.marca)
+      if (m) set.add(m)
+    })
     return [...set].sort()
   }, [avisos])
+
+  const cpsDisponibles = useMemo(() => {
+    const set = new Set()
+    avisos.forEach((a) => {
+      const cp = val(a.direccion?.codigo_postal)
+      if (cp) set.add(cp)
+    })
+    return [...set].sort()
+  }, [avisos])
+
+  const esUrgente = (a, meta) => {
+    const t = val(a.seguro?.tipo_urgencia) || ''
+    if (/urgenc/i.test(t)) return true
+    if (meta.franja === 'Urgencia') return true
+    const est = val(a.estado) || ''
+    if (/urgenc/i.test(est)) return true
+    return false
+  }
+
+  const hayFiltrosActivos = !!(
+    busqueda.trim() ||
+    filtroMarca ||
+    filtroEstado ||
+    filtroCp ||
+    filtroUrgencia ||
+    filtroHorario ||
+    filtroCita
+  )
+
+  const limpiarFiltros = () => {
+    setBusqueda('')
+    setFiltroMarca('')
+    setFiltroEstado('')
+    setFiltroCp('')
+    setFiltroUrgencia('')
+    setFiltroHorario('')
+    setFiltroCita('')
+  }
 
   const avisosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
@@ -185,11 +247,54 @@ export default function App() {
       const meta = getMeta(a)
       if (filtroEstado && meta.estado !== filtroEstado) return false
       if (filtroMarca && val(a.aparato?.marca) !== filtroMarca) return false
+      if (filtroCp && val(a.direccion?.codigo_postal) !== filtroCp) return false
+
+      if (filtroUrgencia === 'si' && !esUrgente(a, meta)) return false
+      if (filtroUrgencia === 'no' && esUrgente(a, meta)) return false
+
+      const tieneHorario = !!val(a.horario)
+      if (filtroHorario === 'con' && !tieneHorario) return false
+      if (filtroHorario === 'sin' && tieneHorario) return false
+
+      const tieneCita = !!(meta.citaFecha || meta.citaHora)
+      if (filtroCita === 'con' && !tieneCita) return false
+      if (filtroCita === 'sin' && tieneCita) return false
+
       if (!q) return true
-      const blob = [a.aviso, a.orden, a.cliente?.nombre, a.cliente?.telefonos, a.cliente?.nif, a.direccion?.completa, a.direccion?.codigo_postal, a.aparato?.marca, a.aparato?.modelo, a.aparato?.tipo, a.averia?.causa, a.seguro?.compania, meta.nota, meta.estado].filter(Boolean).join(' ').toLowerCase()
+      const blob = [
+        a.aviso,
+        a.orden,
+        a.cliente?.nombre,
+        a.cliente?.telefonos,
+        a.cliente?.nif,
+        a.direccion?.completa,
+        a.direccion?.codigo_postal,
+        a.aparato?.marca,
+        a.aparato?.modelo,
+        a.aparato?.tipo,
+        a.averia?.causa,
+        a.seguro?.compania,
+        a.seguro?.tipo_urgencia,
+        a.horario,
+        meta.nota,
+        meta.estado,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
       return blob.includes(q)
     })
-  }, [avisos, busqueda, filtroMarca, filtroEstado, metaTick])
+  }, [
+    avisos,
+    busqueda,
+    filtroMarca,
+    filtroEstado,
+    filtroCp,
+    filtroUrgencia,
+    filtroHorario,
+    filtroCita,
+    metaTick,
+  ])
 
   const marcasResumen = {}
   avisosFiltrados.forEach((a) => {
@@ -207,11 +312,7 @@ export default function App() {
 
   if (authEnabled && !isAuthenticated) {
     return (
-      <LoginScreen
-        onLogin={login}
-        error={authError}
-        setError={setAuthError}
-      />
+      <LoginScreen onLogin={login} error={authError} setError={setAuthError} />
     )
   }
 
@@ -225,8 +326,12 @@ export default function App() {
           </div>
           {authEnabled && user && (
             <div className="user-bar">
-              <span className="user-email" title={user.email}>{user.email}</span>
-              <button type="button" className="btn-sm" onClick={logout}>Salir</button>
+              <span className="user-email" title={user.email}>
+                {user.email}
+              </span>
+              <button type="button" className="btn-sm" onClick={logout}>
+                Salir
+              </button>
             </div>
           )}
         </div>
@@ -236,23 +341,50 @@ export default function App() {
         <div
           className={`drop-zone ${dragOver ? 'dragover' : ''} ${file ? 'has-file' : ''}`}
           onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragOver(true)
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
         >
-          <input ref={inputRef} type="file" accept="application/pdf,.pdf" onChange={(e) => setFileSafe(e.target.files?.[0])} />
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={(e) => setFileSafe(e.target.files?.[0])}
+          />
           <div style={{ fontSize: '1.8rem', marginBottom: '0.4rem' }}>PDF</div>
-          <div className="hint">Arrastra aqui el PDF del boletin o haz clic para seleccionarlo</div>
-          {file && <div className="filename">{file.name} ({(file.size / 1024).toFixed(1)} KB)</div>}
+          <div className="hint">
+            Arrastra aqui el PDF del boletin o haz clic para seleccionarlo
+          </div>
+          {file && (
+            <div className="filename">
+              {file.name} ({(file.size / 1024).toFixed(1)} KB)
+            </div>
+          )}
         </div>
 
         <div className="btn-row">
-          <button className="btn" onClick={procesarPdf} disabled={loading || !file}>Procesar PDF</button>
-          <button className="btn btn-secondary" onClick={cargarDemo}>Cargar datos de ejemplo</button>
-          <button className="btn btn-secondary" onClick={() => setShowHist((v) => !v)}>Historial ({historial.length})</button>
-          <button className="btn btn-secondary" onClick={() => setShowCloud((v) => !v)}>Nube / BD</button>
+          <button className="btn" onClick={procesarPdf} disabled={loading || !file}>
+            Procesar PDF
+          </button>
+          <button className="btn btn-secondary" onClick={cargarDemo}>
+            Cargar datos de ejemplo
+          </button>
+          <button className="btn btn-secondary" onClick={() => setShowHist((v) => !v)}>
+            Historial ({historial.length})
+          </button>
+          <button className="btn btn-secondary" onClick={() => setShowCloud((v) => !v)}>
+            Nube / BD
+          </button>
           {avisos.length > 0 && (
-            <button className="btn btn-secondary" onClick={() => exportAvisosCsv(avisosFiltrados)}>Exportar CSV</button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => exportAvisosCsv(avisosFiltrados)}
+            >
+              Exportar CSV
+            </button>
           )}
         </div>
 
@@ -280,9 +412,18 @@ export default function App() {
                   <li key={h.id}>
                     <button type="button" className="hist-item" onClick={() => cargarHistorial(h)}>
                       <span className="hist-name">{h.nombre}</span>
-                      <span className="hist-meta">{h.count} avisos · {new Date(h.fecha).toLocaleString('es-ES')}</span>
+                      <span className="hist-meta">
+                        {h.count} avisos · {new Date(h.fecha).toLocaleString('es-ES')}
+                      </span>
                     </button>
-                    <button type="button" className="btn-x" onClick={(e) => borrarHistorial(h.id, e)} title="Eliminar">×</button>
+                    <button
+                      type="button"
+                      className="btn-x"
+                      onClick={(e) => borrarHistorial(h.id, e)}
+                      title="Eliminar"
+                    >
+                      ×
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -295,20 +436,109 @@ export default function App() {
 
       <div className="toolbar">
         <div className="vista-toggle">
-          <button type="button" className={vista === 'lista' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('lista')}>Lista</button>
-          <button type="button" className={vista === 'calendario' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('calendario')}>Calendario</button>
+          <button
+            type="button"
+            className={vista === 'lista' ? 'btn-sm active' : 'btn-sm'}
+            onClick={() => setVista('lista')}
+          >
+            Lista
+          </button>
+          <button
+            type="button"
+            className={vista === 'calendario' ? 'btn-sm active' : 'btn-sm'}
+            onClick={() => setVista('calendario')}
+          >
+            Calendario
+          </button>
         </div>
         {vista === 'lista' && avisos.length > 0 && (
           <>
-            <input type="search" className="search-input" placeholder="Buscar nombre, aviso, modelo, CP..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-            <select value={filtroMarca} onChange={(e) => setFiltroMarca(e.target.value)} className="filter-select">
+            <input
+              type="search"
+              className="search-input"
+              placeholder="Buscar nombre, aviso, modelo, CP…"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            <select
+              value={filtroCp}
+              onChange={(e) => setFiltroCp(e.target.value)}
+              className="filter-select"
+              title="Código postal"
+            >
+              <option value="">Todos los CP</option>
+              {cpsDisponibles.map((cp) => (
+                <option key={cp} value={cp}>
+                  {cp}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtroMarca}
+              onChange={(e) => setFiltroMarca(e.target.value)}
+              className="filter-select"
+              title="Marca"
+            >
               <option value="">Todas las marcas</option>
-              {marcasDisponibles.map((m) => <option key={m} value={m}>{m}</option>)}
+              {marcasDisponibles.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
             </select>
-            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="filter-select">
+            <select
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              className="filter-select"
+              title="Estado"
+            >
               <option value="">Todos los estados</option>
-              {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
+              {ESTADOS.map((e) => (
+                <option key={e} value={e}>
+                  {e}
+                </option>
+              ))}
             </select>
+            <select
+              value={filtroUrgencia}
+              onChange={(e) => setFiltroUrgencia(e.target.value)}
+              className="filter-select"
+              title="Urgencia"
+            >
+              <option value="">Urgencia: todas</option>
+              <option value="si">Solo urgentes</option>
+              <option value="no">No urgentes</option>
+            </select>
+            <select
+              value={filtroHorario}
+              onChange={(e) => setFiltroHorario(e.target.value)}
+              className="filter-select"
+              title="Horario del boletín"
+            >
+              <option value="">Horario boletín: todos</option>
+              <option value="con">Con horario</option>
+              <option value="sin">Sin horario</option>
+            </select>
+            <select
+              value={filtroCita}
+              onChange={(e) => setFiltroCita(e.target.value)}
+              className="filter-select"
+              title="Cita planificada"
+            >
+              <option value="">Cita: todas</option>
+              <option value="con">Con cita</option>
+              <option value="sin">Sin cita</option>
+            </select>
+            {hayFiltrosActivos && (
+              <button
+                type="button"
+                className="btn-sm"
+                onClick={limpiarFiltros}
+                title="Quitar todos los filtros"
+              >
+                Limpiar filtros
+              </button>
+            )}
           </>
         )}
       </div>
@@ -317,7 +547,11 @@ export default function App() {
         <div className="summary">
           <div className="stat">
             <div className="num">{avisosFiltrados.length}</div>
-            <div className="label">{avisosFiltrados.length === avisos.length ? 'Avisos' : `de ${avisos.length}`}</div>
+            <div className="label">
+              {avisosFiltrados.length === avisos.length
+                ? 'Avisos'
+                : `de ${avisos.length}`}
+            </div>
           </div>
           {Object.entries(marcasResumen).map(([m, c]) => (
             <div className="stat" key={m}>
@@ -349,12 +583,30 @@ export default function App() {
 
       <div className="avisos">
         {vista === 'calendario' ? null : avisos.length === 0 ? (
-          <div className="empty-state"><p>Selecciona un PDF y pulsa <strong>Procesar PDF</strong><br />o abre el <strong>Historial</strong> / datos de ejemplo.<br />El calendario une las citas de todos los boletines guardados.</p></div>
+          <div className="empty-state">
+            <p>
+              Selecciona un PDF y pulsa <strong>Procesar PDF</strong>
+              <br />
+              o abre el <strong>Historial</strong> / datos de ejemplo.
+              <br />
+              El calendario une las citas de todos los boletines guardados.
+            </p>
+          </div>
         ) : avisosFiltrados.length === 0 ? (
-          <div className="empty-state"><p>Ningun aviso coincide con los filtros.</p></div>
+          <div className="empty-state">
+            <p>Ningun aviso coincide con los filtros.</p>
+          </div>
         ) : (
           avisosFiltrados.map((a, i) => (
-            <div key={`${a.orden}-${a.aviso}-${i}`} id={`aviso-${a.aviso}`} className={scrollToAviso && String(a.aviso) === scrollToAviso ? 'aviso-highlight-wrap' : undefined}>
+            <div
+              key={`${a.orden}-${a.aviso}-${i}`}
+              id={`aviso-${a.aviso}`}
+              className={
+                scrollToAviso && String(a.aviso) === scrollToAviso
+                  ? 'aviso-highlight-wrap'
+                  : undefined
+              }
+            >
               <AvisoCard
                 aviso={a}
                 onMetaChange={() => setMetaTick((t) => t + 1)}
