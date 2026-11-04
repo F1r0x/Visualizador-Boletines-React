@@ -13,6 +13,7 @@ import {
   avisosSinCita,
   labelAvisoCorto,
   mapsRutaUrl,
+  ordenarPorZona,
   estadoClass,
 } from '../utils/calendario'
 import { setMeta, FRANJAS } from '../utils/localMeta'
@@ -115,7 +116,12 @@ export default function CalendarioView({
     return n
   }, [porDia])
 
-  const rutaMaps = useMemo(() => mapsRutaUrl(delDia), [delDia])
+  const rutaOrdenada = useMemo(() => ordenarPorZona(delDia), [delDia])
+  const rutaMaps = useMemo(
+    () => mapsRutaUrl(rutaOrdenada, { porZona: false }),
+    [rutaOrdenada]
+  )
+  const rutaTruncada = rutaOrdenada.length > 10
 
   const irHoy = () => {
     const now = new Date()
@@ -177,7 +183,6 @@ export default function CalendarioView({
       ? formatMesAnio(monthStart)
       : `${formatDiaLargo(weekStart)} – ${addDays(weekStart, 6).getDate()}`
 
-  // Semana: todos los avisos. Mes: límite de chips.
   const maxChips = modo === 'semana' ? 999 : nCols <= 5 ? 4 : 3
   const rowH = modo === 'semana' ? null : nCols <= 5 ? 118 : 96
 
@@ -281,9 +286,7 @@ export default function CalendarioView({
         </div>
       )}
 
-      <div
-        className={`cal-board full ${modo}${modo === 'semana' ? ' week-expand' : ''}`}
-      >
+      <div className={`cal-board full ${modo}${modo === 'semana' ? ' week-expand' : ''}`}>
         <div
           className="cal-weekdays"
           style={{ gridTemplateColumns: `repeat(${nCols}, minmax(0, 1fr))` }}
@@ -340,13 +343,7 @@ export default function CalendarioView({
                       } ${meta.citaOrigen === 'boletin' ? 'origen-boletin' : ''} ${
                         meta.citaOrigen === 'manual' ? 'origen-manual' : ''
                       }`}
-                      title={`${meta.citaHora ? meta.citaHora + ' · ' : ''}${labelAvisoCorto(a)}${
-                        meta.citaOrigen === 'boletin'
-                          ? ' · Hora del boletín'
-                          : meta.citaOrigen === 'manual'
-                            ? ' · Hora manual'
-                            : ''
-                      }`}
+                      title={`${meta.citaHora ? meta.citaHora + ' · ' : ''}${labelAvisoCorto(a)}`}
                     >
                       {meta.citaOrigen === 'boletin' && (
                         <span className="chip-origen" aria-hidden>
@@ -396,36 +393,41 @@ export default function CalendarioView({
                   Sin cita ({sinCita.length})
                 </button>
               </div>
-              <button
-                type="button"
-                className="btn-sm"
-                onClick={() => setShowPopup(false)}
-                title="Cerrar"
-              >
+              <button type="button" className="btn-sm" onClick={() => setShowPopup(false)} title="Cerrar">
                 ✕
               </button>
             </div>
 
             {popupTab === 'ruta' && (
               <div className="cal-ruta">
-                {delDia.length > 0 && rutaMaps && (
-                  <a
-                    className="btn-sm cal-maps-btn"
-                    href={rutaMaps}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Abrir ruta en Maps ({delDia.length})
-                  </a>
+                {rutaOrdenada.length > 0 && rutaMaps && (
+                  <div className="ruta-actions">
+                    <a
+                      className="btn-sm cal-maps-btn"
+                      href={rutaMaps}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Ruta ordenada por código postal / zona"
+                    >
+                      Abrir ruta en Maps ({Math.min(rutaOrdenada.length, 10)}
+                      {rutaTruncada ? ` de ${rutaOrdenada.length}` : ''})
+                    </a>
+                    <p className="ruta-hint">
+                      Orden por zona (CP)
+                      {rutaTruncada
+                        ? ' · Maps admite hasta 10 paradas; se usan las 10 primeras.'
+                        : '.'}
+                    </p>
+                  </div>
                 )}
-                {delDia.length === 0 ? (
+                {rutaOrdenada.length === 0 ? (
                   <p className="hist-empty">
                     No hay avisos este día.
                     {sinCita.length > 0 && ' Cambia a «Sin cita» para asignar uno.'}
                   </p>
                 ) : (
                   <ol className="ruta-list">
-                    {delDia.map(({ aviso: a, meta }, idx) => (
+                    {rutaOrdenada.map(({ aviso: a, meta }, idx) => (
                       <li key={avisoKeySafe(a)} className="ruta-item">
                         <span className="ruta-num">{idx + 1}</span>
                         <div className="ruta-body">
@@ -443,10 +445,13 @@ export default function CalendarioView({
                             )}
                           </button>
                           <div className="ruta-meta">
-                            {[val(a.direccion?.completa), val(a.direccion?.codigo_postal)]
-                              .filter(Boolean)
-                              .join(' · ') || 'Sin dirección'}
+                            {val(a.direccion?.codigo_postal) && (
+                              <span className="ruta-cp">{val(a.direccion.codigo_postal)}</span>
+                            )}{' '}
+                            {[val(a.direccion?.completa)].filter(Boolean).join(' · ') ||
+                              'Sin dirección'}
                             {val(a.aparato?.marca) && ` · ${val(a.aparato.marca)}`}
+                            {meta.citaHora && ` · ${meta.citaHora}`}
                           </div>
                           <div className="ruta-controls">
                             <input
