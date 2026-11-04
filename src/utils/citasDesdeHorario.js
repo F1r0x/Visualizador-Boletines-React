@@ -70,6 +70,7 @@ export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
       const hoy = new Date()
       const hoyYmd = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
       const fecha =
+        parseFechaBoletin(a.fechas?.limite_primera_visita) ||
         parseFechaBoletin(a.fecha_encabezado) ||
         parseFechaBoletin(a.fecha_creacion) ||
         meta.citaFecha ||
