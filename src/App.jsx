@@ -3,6 +3,7 @@ import AvisoCard from './components/AvisoCard'
 import CalendarioView from './components/CalendarioView'
 import CloudPanel from './components/CloudPanel'
 import LoginScreen from './components/LoginScreen'
+import RemindersBanner from './components/RemindersBanner'
 import { useAuth } from './hooks/useAuth'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { aplicarCitasDesdeHorario } from './utils/citasDesdeHorario'
@@ -238,53 +239,24 @@ export default function App() {
       if (filtroEstado && meta.estado !== filtroEstado) return false
       if (filtroMarca && val(a.aparato?.marca) !== filtroMarca) return false
       if (filtroCp && val(a.direccion?.codigo_postal) !== filtroCp) return false
-
       if (filtroUrgencia === 'si' && !esUrgente(a, meta)) return false
       if (filtroUrgencia === 'no' && esUrgente(a, meta)) return false
-
       const tieneHorario = !!val(a.horario)
       if (filtroHorario === 'con' && !tieneHorario) return false
       if (filtroHorario === 'sin' && tieneHorario) return false
-
       const tieneCita = !!(meta.citaFecha || meta.citaHora)
       if (filtroCita === 'con' && !tieneCita) return false
       if (filtroCita === 'sin' && tieneCita) return false
-
       if (!q) return true
       const blob = [
-        a.aviso,
-        a.orden,
-        a.cliente?.nombre,
-        a.cliente?.telefonos,
-        a.cliente?.nif,
-        a.direccion?.completa,
-        a.direccion?.codigo_postal,
-        a.aparato?.marca,
-        a.aparato?.modelo,
-        a.aparato?.tipo,
-        a.averia?.causa,
-        a.seguro?.compania,
-        a.seguro?.tipo_urgencia,
-        a.horario,
-        meta.nota,
-        meta.estado,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
+        a.aviso, a.orden, a.cliente?.nombre, a.cliente?.telefonos, a.cliente?.nif,
+        a.direccion?.completa, a.direccion?.codigo_postal, a.aparato?.marca,
+        a.aparato?.modelo, a.aparato?.tipo, a.averia?.causa, a.seguro?.compania,
+        a.seguro?.tipo_urgencia, a.horario, meta.nota, meta.estado,
+      ].filter(Boolean).join(' ').toLowerCase()
       return blob.includes(q)
     })
-  }, [
-    avisos,
-    busqueda,
-    filtroMarca,
-    filtroEstado,
-    filtroCp,
-    filtroUrgencia,
-    filtroHorario,
-    filtroCita,
-    metaTick,
-  ])
+  }, [avisos, busqueda, filtroMarca, filtroEstado, filtroCp, filtroUrgencia, filtroHorario, filtroCita, metaTick])
 
   const marcasResumen = {}
   avisosFiltrados.forEach((a) => {
@@ -301,9 +273,7 @@ export default function App() {
   }
 
   if (authEnabled && !isAuthenticated) {
-    return (
-      <LoginScreen onLogin={login} error={authError} setError={setAuthError} />
-    )
+    return <LoginScreen onLogin={login} error={authError} setError={setAuthError} />
   }
 
   return (
@@ -316,12 +286,8 @@ export default function App() {
           </div>
           {authEnabled && user && (
             <div className="user-bar">
-              <span className="user-email" title={user.email}>
-                {user.email}
-              </span>
-              <button type="button" className="btn-sm" onClick={logout}>
-                Salir
-              </button>
+              <span className="user-email" title={user.email}>{user.email}</span>
+              <button type="button" className="btn-sm" onClick={logout}>Salir</button>
             </div>
           )}
         </div>
@@ -331,47 +297,22 @@ export default function App() {
         <div
           className={`drop-zone ${dragOver ? 'dragover' : ''} ${file ? 'has-file' : ''}`}
           onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault()
-            setDragOver(true)
-          }}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
         >
-          <input
-            ref={inputRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            onChange={(e) => setFileSafe(e.target.files?.[0])}
-          />
+          <input ref={inputRef} type="file" accept="application/pdf,.pdf" onChange={(e) => setFileSafe(e.target.files?.[0])} />
           <div style={{ fontSize: '1.8rem', marginBottom: '0.4rem' }}>PDF</div>
-          <div className="hint">
-            Arrastra aqui el PDF del boletin o haz clic para seleccionarlo
-          </div>
-          {file && (
-            <div className="filename">
-              {file.name} ({(file.size / 1024).toFixed(1)} KB)
-            </div>
-          )}
+          <div className="hint">Arrastra aqui el PDF del boletin o haz clic para seleccionarlo</div>
+          {file && <div className="filename">{file.name} ({(file.size / 1024).toFixed(1)} KB)</div>}
         </div>
 
         <div className="btn-row">
-          <button className="btn" onClick={procesarPdf} disabled={loading || !file}>
-            Procesar PDF
-          </button>
-          <button className="btn btn-secondary" onClick={() => setShowHist((v) => !v)}>
-            Historial ({historial.length})
-          </button>
-          <button className="btn btn-secondary" onClick={() => setShowCloud((v) => !v)}>
-            Nube / BD
-          </button>
+          <button className="btn" onClick={procesarPdf} disabled={loading || !file}>Procesar PDF</button>
+          <button className="btn btn-secondary" onClick={() => setShowHist((v) => !v)}>Historial ({historial.length})</button>
+          <button className="btn btn-secondary" onClick={() => setShowCloud((v) => !v)}>Nube / BD</button>
           {avisos.length > 0 && (
-            <button
-              className="btn btn-secondary"
-              onClick={() => exportAvisosCsv(avisosFiltrados)}
-            >
-              Exportar CSV
-            </button>
+            <button className="btn btn-secondary" onClick={() => exportAvisosCsv(avisosFiltrados)}>Exportar CSV</button>
           )}
         </div>
 
@@ -399,18 +340,9 @@ export default function App() {
                   <li key={h.id}>
                     <button type="button" className="hist-item" onClick={() => cargarHistorial(h)}>
                       <span className="hist-name">{h.nombre}</span>
-                      <span className="hist-meta">
-                        {h.count} avisos · {new Date(h.fecha).toLocaleString('es-ES')}
-                      </span>
+                      <span className="hist-meta">{h.count} avisos · {new Date(h.fecha).toLocaleString('es-ES')}</span>
                     </button>
-                    <button
-                      type="button"
-                      className="btn-x"
-                      onClick={(e) => borrarHistorial(h.id, e)}
-                      title="Eliminar"
-                    >
-                      ×
-                    </button>
+                    <button type="button" className="btn-x" onClick={(e) => borrarHistorial(h.id, e)} title="Eliminar">×</button>
                   </li>
                 ))}
               </ul>
@@ -421,110 +353,58 @@ export default function App() {
         {status.msg && <div className={`status ${status.type}`}>{status.msg}</div>}
       </div>
 
+      <RemindersBanner
+        avisos={avisosCalendario}
+        metaTick={metaTick}
+        onSelectAviso={(a) => {
+          const key = avisoKey(a)
+          setAvisos((prev) => {
+            if (prev.some((x) => avisoKey(x) === key)) return prev
+            return [a, ...prev]
+          })
+          setVista('lista')
+          setScrollToAviso(String(a.aviso ?? a.orden))
+          setTimeout(() => setScrollToAviso(null), 2000)
+        }}
+      />
+
       <div className="toolbar">
         <div className="vista-toggle">
-          <button
-            type="button"
-            className={vista === 'lista' ? 'btn-sm active' : 'btn-sm'}
-            onClick={() => setVista('lista')}
-          >
-            Lista
-          </button>
-          <button
-            type="button"
-            className={vista === 'calendario' ? 'btn-sm active' : 'btn-sm'}
-            onClick={() => setVista('calendario')}
-          >
-            Calendario
-          </button>
+          <button type="button" className={vista === 'lista' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('lista')}>Lista</button>
+          <button type="button" className={vista === 'calendario' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('calendario')}>Calendario</button>
         </div>
         {vista === 'lista' && avisos.length > 0 && (
           <>
-            <input
-              type="search"
-              className="search-input"
-              placeholder="Buscar nombre, aviso, modelo, CP…"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
-            <select
-              value={filtroCp}
-              onChange={(e) => setFiltroCp(e.target.value)}
-              className="filter-select"
-              title="Código postal"
-            >
+            <input type="search" className="search-input" placeholder="Buscar nombre, aviso, modelo, CP…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <select value={filtroCp} onChange={(e) => setFiltroCp(e.target.value)} className="filter-select" title="Código postal">
               <option value="">Todos los CP</option>
-              {cpsDisponibles.map((cp) => (
-                <option key={cp} value={cp}>
-                  {cp}
-                </option>
-              ))}
+              {cpsDisponibles.map((cp) => <option key={cp} value={cp}>{cp}</option>)}
             </select>
-            <select
-              value={filtroMarca}
-              onChange={(e) => setFiltroMarca(e.target.value)}
-              className="filter-select"
-              title="Marca"
-            >
+            <select value={filtroMarca} onChange={(e) => setFiltroMarca(e.target.value)} className="filter-select" title="Marca">
               <option value="">Todas las marcas</option>
-              {marcasDisponibles.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
+              {marcasDisponibles.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
-            <select
-              value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              className="filter-select"
-              title="Estado"
-            >
+            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="filter-select" title="Estado">
               <option value="">Todos los estados</option>
-              {ESTADOS.map((e) => (
-                <option key={e} value={e}>
-                  {e}
-                </option>
-              ))}
+              {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
             </select>
-            <select
-              value={filtroUrgencia}
-              onChange={(e) => setFiltroUrgencia(e.target.value)}
-              className="filter-select"
-              title="Urgencia"
-            >
+            <select value={filtroUrgencia} onChange={(e) => setFiltroUrgencia(e.target.value)} className="filter-select" title="Urgencia">
               <option value="">Urgencia: todas</option>
               <option value="si">Solo urgentes</option>
               <option value="no">No urgentes</option>
             </select>
-            <select
-              value={filtroHorario}
-              onChange={(e) => setFiltroHorario(e.target.value)}
-              className="filter-select"
-              title="Horario del boletín"
-            >
+            <select value={filtroHorario} onChange={(e) => setFiltroHorario(e.target.value)} className="filter-select" title="Horario del boletín">
               <option value="">Horario boletín: todos</option>
               <option value="con">Con horario</option>
               <option value="sin">Sin horario</option>
             </select>
-            <select
-              value={filtroCita}
-              onChange={(e) => setFiltroCita(e.target.value)}
-              className="filter-select"
-              title="Cita planificada"
-            >
+            <select value={filtroCita} onChange={(e) => setFiltroCita(e.target.value)} className="filter-select" title="Cita planificada">
               <option value="">Cita: todas</option>
               <option value="con">Con cita</option>
               <option value="sin">Sin cita</option>
             </select>
             {hayFiltrosActivos && (
-              <button
-                type="button"
-                className="btn-sm"
-                onClick={limpiarFiltros}
-                title="Quitar todos los filtros"
-              >
-                Limpiar filtros
-              </button>
+              <button type="button" className="btn-sm" onClick={limpiarFiltros} title="Quitar todos los filtros">Limpiar filtros</button>
             )}
           </>
         )}
@@ -534,11 +414,7 @@ export default function App() {
         <div className="summary">
           <div className="stat">
             <div className="num">{avisosFiltrados.length}</div>
-            <div className="label">
-              {avisosFiltrados.length === avisos.length
-                ? 'Avisos'
-                : `de ${avisos.length}`}
-            </div>
+            <div className="label">{avisosFiltrados.length === avisos.length ? 'Avisos' : `de ${avisos.length}`}</div>
           </div>
           {Object.entries(marcasResumen).map(([m, c]) => (
             <div className="stat" key={m}>
@@ -580,25 +456,15 @@ export default function App() {
             </p>
           </div>
         ) : avisosFiltrados.length === 0 ? (
-          <div className="empty-state">
-            <p>Ningun aviso coincide con los filtros.</p>
-          </div>
+          <div className="empty-state"><p>Ningun aviso coincide con los filtros.</p></div>
         ) : (
           avisosFiltrados.map((a, i) => (
             <div
               key={`${a.orden}-${a.aviso}-${i}`}
               id={`aviso-${a.aviso}`}
-              className={
-                scrollToAviso && String(a.aviso) === scrollToAviso
-                  ? 'aviso-highlight-wrap'
-                  : undefined
-              }
+              className={scrollToAviso && String(a.aviso) === scrollToAviso ? 'aviso-highlight-wrap' : undefined}
             >
-              <AvisoCard
-                aviso={a}
-                onMetaChange={() => setMetaTick((t) => t + 1)}
-                onDelete={eliminarAviso}
-              />
+              <AvisoCard aviso={a} onMetaChange={() => setMetaTick((t) => t + 1)} onDelete={eliminarAviso} />
             </div>
           ))
         )}
