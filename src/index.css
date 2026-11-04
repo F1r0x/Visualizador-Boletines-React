@@ -93,31 +93,6 @@ header p { color: var(--muted); margin-top: 0.35rem; font-size: 0.95rem; }
 .aviso-cita h4 { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; font-weight: 600; }
 .cita-row { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
 .cita-row input, .cita-row select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 0.35rem 0.5rem; font-size: 0.85rem; }
-.cal-wrap { margin-bottom: 1.5rem; }
-.cal-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
-.cal-range { color: var(--muted); font-size: 0.9rem; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; margin-bottom: 1.25rem; }
-@media (max-width: 900px) { .cal-grid { grid-template-columns: repeat(2, 1fr); } }
-.cal-day { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem; text-align: left; color: var(--text); cursor: pointer; min-height: 100px; }
-.cal-day:hover { border-color: var(--accent); }
-.cal-day.hoy { border-color: var(--success); }
-.cal-day.sel { background: rgba(59,130,246,0.12); border-color: var(--accent); }
-.cal-day-head { font-weight: 700; font-size: 0.8rem; margin-bottom: 0.25rem; text-transform: capitalize; }
-.cal-day-count { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem; }
-.cal-day-list { list-style: none; font-size: 0.7rem; color: var(--muted); }
-.cal-day-list li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cal-ruta { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.15rem; }
-.cal-ruta h3 { font-size: 1rem; margin-bottom: 0.75rem; text-transform: capitalize; }
-.ruta-list { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
-.ruta-list li { display: flex; gap: 0.65rem; align-items: flex-start; }
-.ruta-num { flex-shrink: 0; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--accent); color: white; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-.ruta-title { background: none; border: none; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-align: left; padding: 0; }
-.ruta-title:hover { color: var(--accent); }
-.ruta-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
-.franja-tag { display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; background: var(--section); }
-.franja-tag.franja-urgencia { background: rgba(248,113,113,0.25); color: #f87171; }
-.franja-tag.franja-mañana, .franja-tag.franja-manana { background: rgba(251,191,36,0.2); color: #fbbf24; }
-.franja-tag.franja-tarde { background: rgba(59,130,246,0.2); color: #60a5fa; }
 .aviso-highlight-wrap .aviso-card { box-shadow: 0 0 0 2px var(--accent); }
 footer { text-align: center; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; }
 @media (max-width: 600px) { body { padding: 1rem; } .btn { width: 100%; justify-content: center; } }
