@@ -70,20 +70,40 @@ export function celdasDelMes(monthStart) {
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
 }
 
+/**
+ * Orden de ruta por zona: CP y luego dirección.
+ */
+export function ordenarPorZona(items) {
+  return [...items].sort((x, y) => {
+    const cpx = val(x.aviso?.direccion?.codigo_postal) || '99999'
+    const cpy = val(y.aviso?.direccion?.codigo_postal) || '99999'
+    if (cpx !== cpy) return cpx.localeCompare(cpy, 'es')
+    const dx = val(x.aviso?.direccion?.completa) || ''
+    const dy = val(y.aviso?.direccion?.completa) || ''
+    if (dx !== dy) return dx.localeCompare(dy, 'es')
+    const hx = x.meta?.citaHora || '99:99'
+    const hy = y.meta?.citaHora || '99:99'
+    return hx.localeCompare(hy)
+  })
+}
+
+/**
+ * Orden del día: con hora de cita primero; el resto por zona (CP).
+ */
+export function ordenarRutaDelDia(items) {
+  const conHora = items.filter((x) => x.meta?.citaHora)
+  const sinHora = items.filter((x) => !x.meta?.citaHora)
+  conHora.sort((x, y) =>
+    (x.meta.citaHora || '').localeCompare(y.meta.citaHora || '')
+  )
+  return [...conHora, ...ordenarPorZona(sinHora)]
+}
+
 export function avisosDelDia(avisos, ymd) {
   const list = avisos
     .map((a) => ({ aviso: a, meta: metaCita(a) }))
     .filter(({ meta }) => meta.citaFecha === ymd)
-
-  list.sort((x, y) => {
-    const hx = x.meta.citaHora || '99:99'
-    const hy = y.meta.citaHora || '99:99'
-    if (hx !== hy) return hx.localeCompare(hy)
-    const cpx = val(x.aviso.direccion?.codigo_postal) || ''
-    const cpy = val(y.aviso.direccion?.codigo_postal) || ''
-    return cpx.localeCompare(cpy)
-  })
-  return list
+  return ordenarRutaDelDia(list)
 }
 
 export function avisosPorFechas(avisos, ymdList) {
@@ -128,21 +148,30 @@ export function labelAvisoCorto(a) {
   return tipo ? `${nombre} · ${tipo}` : nombre
 }
 
-export function mapsRutaUrl(items) {
-  const dirs = items
+/**
+ * URL Google Maps con varias paradas.
+ * porZona=true ordena por CP antes de construir la ruta.
+ * maxParadas limita el enlace (Maps web ~10 paradas).
+ */
+export function mapsRutaUrl(items, { porZona = true, maxParadas = 10 } = {}) {
+  const ordered = porZona ? ordenarPorZona(items) : [...items]
+  const dirs = ordered
     .map(({ aviso: a }) => {
       const d = val(a.direccion?.completa)
       const cp = val(a.direccion?.codigo_postal)
-      return [d, cp].filter(Boolean).join(', ')
+      return [d, cp, 'España'].filter(Boolean).join(', ')
     })
-    .filter(Boolean)
+    .filter((s) => s && s !== 'España')
+
   if (!dirs.length) return null
   if (dirs.length === 1) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dirs[0])}`
   }
-  const origin = encodeURIComponent(dirs[0])
-  const destination = encodeURIComponent(dirs[dirs.length - 1])
-  const waypoints = dirs
+
+  const limited = dirs.slice(0, Math.max(2, maxParadas))
+  const origin = encodeURIComponent(limited[0])
+  const destination = encodeURIComponent(limited[limited.length - 1])
+  const waypoints = limited
     .slice(1, -1)
     .map((d) => encodeURIComponent(d))
     .join('|')
