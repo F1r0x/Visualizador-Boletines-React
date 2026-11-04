@@ -45,7 +45,16 @@ export default function App() {
   const inputRef = useRef(null)
 
   useEffect(() => {
-    setHistorial(listHistorial())
+    const hist = listHistorial()
+    setHistorial(hist)
+    if (hist.length > 0) {
+      const ultimo = hist[0]
+      setAvisos(ultimo.avisos || [])
+      setStatus({
+        msg: `Cargados avisos anteriores: ${ultimo.nombre} (${ultimo.count} avisos).`,
+        type: 'success',
+      })
+    }
   }, [])
 
   const guardarEnHistorial = (lista, nombre) => {
@@ -245,27 +254,25 @@ export default function App() {
         {status.msg && <div className={`status ${status.type}`}>{status.msg}</div>}
       </div>
 
-      {avisos.length > 0 && (
-        <div className="toolbar">
-          <div className="vista-toggle">
-            <button type="button" className={vista === 'lista' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('lista')}>Lista</button>
-            <button type="button" className={vista === 'calendario' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('calendario')}>Calendario</button>
-          </div>
-          {vista === 'lista' && (
-            <>
-              <input type="search" className="search-input" placeholder="Buscar nombre, aviso, modelo, CP..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-              <select value={filtroMarca} onChange={(e) => setFiltroMarca(e.target.value)} className="filter-select">
-                <option value="">Todas las marcas</option>
-                {marcasDisponibles.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-              <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="filter-select">
-                <option value="">Todos los estados</option>
-                {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
-              </select>
-            </>
-          )}
+      <div className="toolbar">
+        <div className="vista-toggle">
+          <button type="button" className={vista === 'lista' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('lista')}>Lista</button>
+          <button type="button" className={vista === 'calendario' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('calendario')}>Calendario</button>
         </div>
-      )}
+        {vista === 'lista' && avisos.length > 0 && (
+          <>
+            <input type="search" className="search-input" placeholder="Buscar nombre, aviso, modelo, CP..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <select value={filtroMarca} onChange={(e) => setFiltroMarca(e.target.value)} className="filter-select">
+              <option value="">Todas las marcas</option>
+              {marcasDisponibles.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="filter-select">
+              <option value="">Todos los estados</option>
+              {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
+            </select>
+          </>
+        )}
+      </div>
 
       {avisos.length > 0 && vista === 'lista' && (
         <div className="summary">
@@ -282,7 +289,7 @@ export default function App() {
         </div>
       )}
 
-      {avisos.length > 0 && vista === 'calendario' && (
+      {vista === 'calendario' && (
         <CalendarioView
           avisos={avisos}
           metaTick={metaTick}
@@ -297,9 +304,9 @@ export default function App() {
       )}
 
       <div className="avisos">
-        {avisos.length === 0 ? (
-          <div className="empty-state"><p>Selecciona un PDF y pulsa <strong>Procesar PDF</strong><br />o carga los datos de ejemplo.</p></div>
-        ) : vista === 'calendario' ? null : avisosFiltrados.length === 0 ? (
+        {vista === 'calendario' ? null : avisos.length === 0 ? (
+          <div className="empty-state"><p>Selecciona un PDF y pulsa <strong>Procesar PDF</strong><br />o abre el <strong>Historial</strong> / datos de ejemplo.<br />El calendario está disponible arriba aunque no haya avisos cargados.</p></div>
+        ) : avisosFiltrados.length === 0 ? (
           <div className="empty-state"><p>Ningun aviso coincide con los filtros.</p></div>
         ) : (
           avisosFiltrados.map((a, i) => (
