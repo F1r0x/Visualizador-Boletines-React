@@ -1,5 +1,13 @@
 import { getMeta } from './localMeta'
-import { val } from './parseAvisos'
+import { val, parseHorarioBoletin } from './parseAvisos'
+
+function metaCita(a) {
+  const m = getMeta(a)
+  if (m.citaHora) return m
+  const h = parseHorarioBoletin(a.horario)
+  if (h.inicio) return { ...m, citaHora: h.inicio }
+  return m
+}
 
 export function startOfWeek(date = new Date()) {
   const d = new Date(date)
@@ -64,7 +72,7 @@ export function celdasDelMes(monthStart) {
 
 export function avisosDelDia(avisos, ymd) {
   const list = avisos
-    .map((a) => ({ aviso: a, meta: getMeta(a) }))
+    .map((a) => ({ aviso: a, meta: metaCita(a) }))
     .filter(({ meta }) => meta.citaFecha === ymd)
 
   list.sort((x, y) => {
@@ -85,7 +93,7 @@ export function avisosPorFechas(avisos, ymdList) {
     map[k] = []
   })
   avisos.forEach((a) => {
-    const meta = getMeta(a)
+    const meta = metaCita(a)
     if (meta.citaFecha && set.has(meta.citaFecha)) {
       map[meta.citaFecha].push({ aviso: a, meta })
     }
@@ -105,7 +113,7 @@ export function avisosPorSemana(avisos, weekStart) {
 
 export function avisosSinCita(avisos) {
   return avisos
-    .map((a) => ({ aviso: a, meta: getMeta(a) }))
+    .map((a) => ({ aviso: a, meta: metaCita(a) }))
     .filter(({ meta }) => !meta.citaFecha)
     .sort((x, y) => {
       const ax = String(x.aviso.aviso || x.aviso.orden || '')
