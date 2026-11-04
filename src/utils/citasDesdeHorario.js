@@ -31,14 +31,14 @@ function hoyYmd() {
   return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
 }
 
-function fechaPreferida(a, meta) {
-  return (
-    parseFechaBoletin(a.fecha_encabezado) ||
-    parseFechaBoletin(a.fecha_creacion) ||
-    parseFechaBoletin(a.fechas?.limite_primera_visita) ||
-    meta.citaFecha ||
-    hoyYmd()
-  )
+/** Fecha de agenda del PDF (cabecera Fecha:04-11-2026) */
+export function fechaAgendaDelLote(avisos) {
+  for (const a of avisos) {
+    const f =
+      parseFechaBoletin(a.fecha_encabezado) || parseFechaBoletin(a.fecha)
+    if (f) return f
+  }
+  return ''
 }
 
 export function extraerHorarioDeTexto(texto) {
@@ -49,23 +49,26 @@ export function extraerHorarioDeTexto(texto) {
   return m ? m[1].trim() : ''
 }
 
+/**
+ * Al cargar un boletín:
+ * - TODOS → citaFecha = día de la agenda del PDF
+ * - Con HORAS → citaHora + citaOrigen: 'boletin' (preferente)
+ * - Varios en misma franja → reparte horas
+ */
 export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
   if (!Array.isArray(avisos) || !avisos.length) return avisos
 
-  const fechaAgenda =
-    avisos.map((a) => parseFechaBoletin(a.fecha_encabezado)).find(Boolean) || ''
+  const fechaAgenda = fechaAgendaDelLote(avisos) || hoyYmd()
 
   const lista = avisos.map((a) => {
     let horario = limpiarCampo(a.horario)
     if (!horario && a.texto_original) {
       horario = extraerHorarioDeTexto(a.texto_original)
     }
-    const fecha_encabezado =
-      limpiarCampo(a.fecha_encabezado) || fechaAgenda || a.fecha_encabezado || ''
     return {
       ...a,
       horario: horario || a.horario || '',
-      fecha_encabezado,
+      fecha_encabezado: limpiarCampo(a.fecha_encabezado) || fechaAgenda,
     }
   })
 
@@ -93,28 +96,26 @@ export function aplicarCitasDesdeHorario(avisos, { forzar = false } = {}) {
 
     items.forEach(({ a }, i) => {
       const meta = getMeta(a)
-      if (!forzar && meta.citaHora && meta.citaFecha) return
+      // Respetar citas manuales del técnico (salvo forzar = PDF nuevo)
+      if (!forzar && meta.citaOrigen === 'manual' && meta.citaFecha) return
 
       const hora = i === 0 ? inicio : addMinutes(inicio, step * i)
-      const fecha = fechaPreferida(a, meta)
-
-      const patch = {}
-      if (forzar || !meta.citaHora) patch.citaHora = hora
-      if (forzar || !meta.citaFecha) patch.citaFecha = fecha
-      if (Object.keys(patch).length) setMeta(a, patch)
+      setMeta(a, {
+        citaFecha: fechaAgenda,
+        citaHora: hora,
+        citaOrigen: 'boletin',
+      })
     })
   })
 
+  // Sin HORAS: solo día de la agenda
   sinHora.forEach((a) => {
     const meta = getMeta(a)
-    if (!forzar && meta.citaFecha) return
-    const fecha =
-      parseFechaBoletin(a.fecha_encabezado) ||
-      parseFechaBoletin(a.fechas?.limite_primera_visita) ||
-      ''
-    if (fecha && (forzar || !meta.citaFecha)) {
-      setMeta(a, { citaFecha: fecha })
-    }
+    if (!forzar && meta.citaOrigen === 'manual' && meta.citaFecha) return
+    setMeta(a, {
+      citaFecha: fechaAgenda,
+      ...(forzar && !meta.citaHora ? { citaHora: '', citaOrigen: '' } : {}),
+    })
   })
 
   return lista
