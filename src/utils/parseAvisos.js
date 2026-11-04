@@ -52,6 +52,7 @@ export function flatToStructured(items) {
         averia: {},
         seguro: {},
         fechas: {},
+        horario: '',
         tienda_solicitante: '',
         aviso_anterior: '',
       }
@@ -73,6 +74,7 @@ export function flatToStructured(items) {
     else if (key === 'Modalidad') actual.seguro.modalidad = cleaned
     else if (key === 'Expediente') actual.seguro.expediente = cleaned
     else if (key === 'Tipo de urgencia') actual.seguro.tipo_urgencia = cleaned
+    else if (key === 'Horario' || key === 'HORAS' || key === 'Horas') actual.horario = cleaned
     else if (key === 'Límite primera visita') actual.fechas.limite_primera_visita = cleaned
     else if (key === 'Límite terminación') actual.fechas.limite_terminacion = cleaned
     else if (key === 'Tienda solicitante') actual.tienda_solicitante = cleaned
@@ -80,6 +82,25 @@ export function flatToStructured(items) {
   }
   if (actual) avisos.push(actual)
   return avisos
+}
+
+/** Interpreta "09:30-10:30", "9:30 a 10:30", "09:30" */
+export function parseHorarioBoletin(horario) {
+  const s = limpiarCampo(horario)
+  if (!s) return { texto: '', inicio: '', fin: '' }
+
+  const pad = (t) => {
+    const [h, min] = String(t).split(':')
+    return `${String(h).padStart(2, '0')}:${String(min || '00').padStart(2, '0')}`
+  }
+
+  const rango = s.match(/(\d{1,2}:\d{2})\s*[-–—aA]\s*(\d{1,2}:\d{2})/)
+  if (rango) {
+    return { texto: s, inicio: pad(rango[1]), fin: pad(rango[2]) }
+  }
+  const solo = s.match(/(\d{1,2}:\d{2})/)
+  if (solo) return { texto: s, inicio: pad(solo[1]), fin: '' }
+  return { texto: s, inicio: '', fin: '' }
 }
 
 /** Normaliza respuesta de n8n (plana o estructurada) a array de avisos */
@@ -141,6 +162,10 @@ export function normalizarRespuestaN8n(data) {
         limite_primera_visita: limpiarCampo(j.fechas?.limite_primera_visita),
         limite_terminacion: limpiarCampo(j.fechas?.limite_terminacion),
       },
+      horario: limpiarCampo(j.horario ?? j.horas ?? j.HORAS),
+      servicio: limpiarCampo(j.servicio),
+      fecha_encabezado: limpiarCampo(j.fecha_encabezado),
+      tecnico: limpiarCampo(j.tecnico),
       tienda_solicitante: limpiarCampo(j.tienda_solicitante),
       aviso_anterior: limpiarCampo(j.aviso_anterior),
     }
