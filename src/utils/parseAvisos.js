@@ -31,7 +31,6 @@ export function val(v) {
   return s || null
 }
 
-/** Convierte formato plano columnaA/columnaB → array de avisos estructurados */
 export function flatToStructured(items) {
   const avisos = []
   let actual = null
@@ -84,7 +83,6 @@ export function flatToStructured(items) {
   return avisos
 }
 
-/** Interpreta "09:30-10:30", "9:30 a 10:30", "09:30" */
 export function parseHorarioBoletin(horario) {
   const s = limpiarCampo(horario)
   if (!s) return { texto: '', inicio: '', fin: '' }
@@ -103,7 +101,6 @@ export function parseHorarioBoletin(horario) {
   return { texto: s, inicio: '', fin: '' }
 }
 
-/** Normaliza respuesta de n8n (plana o estructurada) a array de avisos */
 export function normalizarRespuestaN8n(data) {
   let items = []
   if (Array.isArray(data)) items = data
@@ -164,10 +161,12 @@ export function normalizarRespuestaN8n(data) {
       },
       horario: limpiarCampo(j.horario ?? j.horas ?? j.HORAS),
       servicio: limpiarCampo(j.servicio),
-      fecha_encabezado: limpiarCampo(j.fecha_encabezado),
+      fecha_encabezado: limpiarCampo(j.fecha_encabezado ?? j.fecha),
+      fecha_creacion: limpiarCampo(j.fecha_creacion),
       tecnico: limpiarCampo(j.tecnico),
       tienda_solicitante: limpiarCampo(j.tienda_solicitante),
       aviso_anterior: limpiarCampo(j.aviso_anterior),
+      texto_original: j.texto_original || j.texto || '',
     }
   })
 }
