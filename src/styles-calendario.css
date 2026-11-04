@@ -37,6 +37,7 @@
   min-width: 0; width: 100%;
 }
 .cal-board.full { width: 100%; }
+.cal-board.week-expand { overflow: visible; }
 
 .cal-weekdays {
   display: grid;
@@ -111,22 +112,42 @@
 .cal-chip.est-terminado { border-left-color: #22c55e; opacity: 0.75; }
 .cal-chip.est-en-curso, .cal-chip.est-en-camino { border-left-color: #3b82f6; }
 .cal-chip.est-pieza-pedida { border-left-color: #fbbf24; }
-
-/* Hora del boletín (preferente) vs manual */
 .cal-chip.origen-boletin {
   border-left-color: #38bdf8;
   background: rgba(56, 189, 248, 0.14);
 }
-.cal-chip.origen-manual {
-  border-left-color: #a78bfa;
-}
-.cal-chip .chip-origen {
-  flex-shrink: 0;
-  font-size: 0.7rem;
-  line-height: 1;
-}
-
+.cal-chip.origen-manual { border-left-color: #a78bfa; }
+.cal-chip .chip-origen { flex-shrink: 0; font-size: 0.7rem; line-height: 1; }
 .cal-day-list .more { font-size: 0.65rem; color: var(--accent); font-weight: 600; }
+
+/* Vista semana: crece hacia abajo y muestra todos los avisos */
+.cal-board.week-expand .cal-grid.week,
+.cal-grid.week {
+  grid-auto-rows: minmax(160px, auto) !important;
+  align-items: stretch;
+}
+.cal-board.week-expand .cal-day,
+.cal-grid.week .cal-day {
+  height: auto !important;
+  max-height: none !important;
+  min-height: 160px;
+  overflow: visible !important;
+}
+.cal-board.week-expand .cal-day-list,
+.cal-grid.week .cal-day-list {
+  overflow: visible !important;
+  flex: 0 0 auto;
+}
+.cal-board.week-expand .cal-chip,
+.cal-grid.week .cal-chip {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 1.3;
+  padding: 0.25rem 0.35rem;
+  font-size: 0.72rem;
+}
+.cal-board.week-expand .cal-day-list .more { display: none; }
 
 .cal-side-tabs { display: flex; gap: 0.35rem; margin-bottom: 0; flex-wrap: wrap; }
 .cal-ruta h3 { font-size: 0.95rem; margin-bottom: 0.65rem; text-transform: capitalize; }
@@ -170,7 +191,6 @@
   display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
   padding: 0.5rem 0.55rem; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);
 }
-
 .cal-popup-overlay {
   position: fixed; inset: 0; z-index: 80;
   background: rgba(0, 0, 0, 0.55);
