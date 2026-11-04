@@ -12,6 +12,8 @@ import {
   listHistorial,
   saveHistorialEntry,
   deleteHistorialEntry,
+  mergeAvisosParaCalendario,
+  removeAvisoFromHistorial,
 } from './utils/historial'
 
 const WEBHOOK_URL = 'https://n8n.automatizatutrabajo.com/webhook/boletines'
@@ -99,6 +101,7 @@ export default function App() {
   const eliminarAviso = (aviso) => {
     const key = avisoKey(aviso)
     setAvisos((prev) => prev.filter((a) => avisoKey(a) !== key && a !== aviso))
+    setHistorial(removeAvisoFromHistorial(aviso))
     deleteMeta(aviso)
     setMetaTick((t) => t + 1)
     setStatus({
@@ -106,6 +109,11 @@ export default function App() {
       type: 'success',
     })
   }
+
+  const avisosCalendario = useMemo(
+    () => mergeAvisosParaCalendario(avisos, historial),
+    [avisos, historial]
+  )
 
   const procesarPdf = async () => {
     if (!file) {
@@ -291,11 +299,16 @@ export default function App() {
 
       {vista === 'calendario' && (
         <CalendarioView
-          avisos={avisos}
+          avisos={avisosCalendario}
           metaTick={metaTick}
           onMetaChange={() => setMetaTick((t) => t + 1)}
           onDelete={eliminarAviso}
           onSelectAviso={(a) => {
+            const key = avisoKey(a)
+            setAvisos((prev) => {
+              if (prev.some((x) => avisoKey(x) === key)) return prev
+              return [a, ...prev]
+            })
             setVista('lista')
             setScrollToAviso(String(a.aviso ?? a.orden))
             setTimeout(() => setScrollToAviso(null), 2000)
@@ -305,7 +318,7 @@ export default function App() {
 
       <div className="avisos">
         {vista === 'calendario' ? null : avisos.length === 0 ? (
-          <div className="empty-state"><p>Selecciona un PDF y pulsa <strong>Procesar PDF</strong><br />o abre el <strong>Historial</strong> / datos de ejemplo.<br />El calendario está disponible arriba aunque no haya avisos cargados.</p></div>
+          <div className="empty-state"><p>Selecciona un PDF y pulsa <strong>Procesar PDF</strong><br />o abre el <strong>Historial</strong> / datos de ejemplo.<br />El calendario une las citas de todos los boletines guardados.</p></div>
         ) : avisosFiltrados.length === 0 ? (
           <div className="empty-state"><p>Ningun aviso coincide con los filtros.</p></div>
         ) : (
