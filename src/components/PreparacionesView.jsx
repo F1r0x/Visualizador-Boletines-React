@@ -15,6 +15,7 @@ import {
   cloudListPreparaciones,
   cloudDeletePreparacion,
 } from '../utils/db'
+import LazyImage from './LazyImage'
 
 function formatFecha(iso) {
   if (!iso) return ''
@@ -734,8 +735,8 @@ export default function PreparacionesView() {
                     </button>
                   </div>
                   <p className="prep-hint">
-                    Pulsa una foto para verla a tamaño completo. Los vídeos grandes mejor como
-                    enlace.
+                    Las miniaturas se cargan al hacerse visibles. Pulsa una foto para verla a
+                    tamaño completo.
                   </p>
                   {(draft.adjuntos || []).length === 0 ? (
                     <p className="hist-empty">Sin adjuntos.</p>
@@ -755,7 +756,7 @@ export default function PreparacionesView() {
                               }
                               title="Ver en grande"
                             >
-                              <img
+                              <LazyImage
                                 src={a.dataUrl}
                                 alt={a.nombre || ''}
                                 className="prep-thumb"
@@ -813,6 +814,7 @@ export default function PreparacionesView() {
             src={lightbox.src}
             alt={lightbox.nombre}
             className="prep-lightbox-img"
+            decoding="async"
             onClick={(e) => e.stopPropagation()}
           />
           {lightbox.nombre && (
