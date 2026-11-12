@@ -61,7 +61,9 @@ export function preparacionesPorFecha(ymd) {
 /**
  * Fichas que deben mostrarse un día en el calendario:
  * - con citaFecha === ymd, o
- * - vinculadas a un aviso que ese día tiene cita
+ * - vinculadas a un aviso que ese día tiene cita (mapa aviso→ymd)
+ * @param {string} ymd
+ * @param {Map<string, string>|Record<string,string>} [avisoToFecha] numAviso → ymd
  */
 export function preparacionesParaDia(ymd, avisoToFecha = null) {
   if (!ymd) return []
@@ -86,6 +88,7 @@ export function createPreparacion(partial = {}) {
     modelo: partial.modelo || '',
     tipo: partial.tipo || '',
     avisoRef: partial.avisoRef || '',
+    /** Cita propia (fichas sueltas o refuerzo del aviso) */
     citaFecha: partial.citaFecha || '',
     citaHora: partial.citaHora || '',
     notas: partial.notas || '',
@@ -104,6 +107,86 @@ export function createPreparacion(partial = {}) {
   const list = [item, ...listPreparaciones()]
   saveAll(list)
   return item
+}
+
+/**
+ * Crea una ficha de preparación vinculada a un aviso de boletín,
+ * rellenando marca, modelo, tipo, nº aviso, piezas del pedido, notas y cita si hay.
+ * @param {object} aviso — JSON del aviso (n8n)
+ * @param {object} [meta] — meta local (citaFecha, citaHora, piezas, nota…)
+ */
+export function createPreparacionFromAviso(aviso, meta = {}) {
+  if (!aviso) throw new Error('Falta el aviso')
+
+  const num = String(aviso.aviso ?? aviso.orden ?? '').replace(/\D/g, '') || ''
+  const marca = String(aviso.aparato?.marca || '').trim()
+  const modelo = String(aviso.aparato?.modelo || '').trim()
+  const tipo = String(aviso.aparato?.tipo || '').trim()
+  const cliente = String(aviso.cliente?.nombre || '').trim()
+
+  const tituloParts = [
+    num ? `#${num}` : null,
+    marca || modelo ? [marca, modelo].filter(Boolean).join(' ') : null,
+    cliente || null,
+  ].filter(Boolean)
+  const titulo = tituloParts.length
+    ? `Prep ${tituloParts.join(' · ')}`
+    : 'Nueva preparación'
+
+  const notasLines = []
+  if (aviso.averia?.causa) notasLines.push(`Causa: ${aviso.averia.causa}`)
+  if (aviso.averia?.sintoma) notasLines.push(`Síntoma: ${aviso.averia.sintoma}`)
+  if (aviso.averia?.diagnostico) notasLines.push(`Diagnóstico: ${aviso.averia.diagnostico}`)
+  if (aviso.direccion?.completa) {
+    const cp = aviso.direccion?.codigo_postal ? ` (${aviso.direccion.codigo_postal})` : ''
+    notasLines.push(`Dirección: ${aviso.direccion.completa}${cp}`)
+  }
+  if (aviso.horario) notasLines.push(`Horario boletín: ${aviso.horario}`)
+  if (aviso.estado) notasLines.push(`Estado: ${aviso.estado}`)
+  if (meta.nota) notasLines.push(`Nota técnico: ${meta.nota}`)
+
+  const piezas = []
+  const seen = new Set()
+  const pushPieza = (ref, descripcion) => {
+    const r = String(ref || '').trim()
+    const d = String(descripcion || '').trim()
+    if (!r && !d) return
+    const key = `${r}|${d}`.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    piezas.push({
+      id: uid(),
+      ref: r,
+      descripcion: d,
+      cantidad: 1,
+    })
+  }
+
+  const pedidoPiezas = aviso.pedido?.piezas
+  if (Array.isArray(pedidoPiezas)) {
+    pedidoPiezas.forEach((p) => {
+      if (typeof p === 'string') pushPieza('', p)
+      else pushPieza(p.referencia || p.ref, p.descripcion || p.nombre || '')
+    })
+  }
+  if (Array.isArray(meta.piezas)) {
+    meta.piezas.forEach((p) => {
+      if (typeof p === 'string') pushPieza('', p)
+      else pushPieza(p.ref || p.referencia, p.descripcion || p.nombre || p)
+    })
+  }
+
+  return createPreparacion({
+    titulo,
+    marca,
+    modelo,
+    tipo,
+    avisoRef: num || String(aviso.aviso ?? ''),
+    citaFecha: meta.citaFecha || '',
+    citaHora: meta.citaHora || '',
+    notas: notasLines.join('\n'),
+    piezas,
+  })
 }
 
 export function updatePreparacion(id, patch) {
