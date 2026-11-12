@@ -4,6 +4,7 @@ import { val } from './parseAvisos'
 
 export { isSupabaseConfigured }
 
+/** Guarda un lote de avisos + su meta local en Supabase */
 export async function cloudSaveBatch(nombre, avisos) {
   if (!supabase || !avisos?.length) {
     throw new Error('Supabase no configurado o sin avisos')
@@ -55,6 +56,7 @@ export async function cloudSaveBatch(nombre, avisos) {
   return batch
 }
 
+/** Lista de lotes en la nube */
 export async function cloudListBatches() {
   if (!supabase) return []
   const { data, error } = await supabase
@@ -66,6 +68,24 @@ export async function cloudListBatches() {
   return data || []
 }
 
+/**
+ * Elimina un lote de la nube: avisos del batch + fila en batches.
+ * No borra aviso_meta (puede compartirse entre lotes por aviso_key).
+ */
+export async function cloudDeleteBatch(batchId) {
+  if (!supabase) throw new Error('Supabase no configurado')
+  if (!batchId) throw new Error('Falta el id del lote')
+
+  const { error: e1 } = await supabase.from('avisos').delete().eq('batch_id', batchId)
+  if (e1) throw e1
+
+  const { error: e2 } = await supabase.from('batches').delete().eq('id', batchId)
+  if (e2) throw e2
+
+  return true
+}
+
+/** Carga avisos de un lote y aplica meta en localStorage */
 export async function cloudLoadBatch(batchId) {
   if (!supabase) throw new Error('Supabase no configurado')
 

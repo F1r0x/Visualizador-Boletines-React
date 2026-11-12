@@ -4,6 +4,7 @@ import {
   cloudListBatches,
   cloudLoadBatch,
   cloudSaveBatch,
+  cloudDeleteBatch,
   cloudSyncMeta,
   cloudSearchClientes,
   cloudStats,
@@ -86,6 +87,32 @@ export default function CloudPanel({ avisos, onLoadAvisos, onStatus }) {
     }
   }
 
+  const eliminarLote = async (batch, e) => {
+    e?.stopPropagation?.()
+    const nombre = batch?.nombre || 'este lote'
+    const n = batch?.avisos_count ?? 0
+    if (
+      !window.confirm(
+        `¿Eliminar de la nube «${nombre}»${n ? ` (${n} avisos)` : ''}?\n\nSe borrará el lote y sus avisos en Supabase. Esta acción no se puede deshacer.`
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    try {
+      await cloudDeleteBatch(batch.id)
+      onStatus?.({
+        msg: `Lote eliminado de la nube: ${nombre}.`,
+        type: 'success',
+      })
+      await refresh()
+    } catch (err) {
+      onStatus?.({ msg: `Error al eliminar: ${err.message}`, type: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const buscar = async () => {
     if (!q.trim()) return
     setBusy(true)
@@ -139,7 +166,19 @@ VITE_SUPABASE_ANON_KEY=tu_anon_key`}</pre>
                 <li key={b.id}>
                   <button type="button" className="hist-item" onClick={() => cargar(b.id)} disabled={busy}>
                     <span className="hist-name">{b.nombre}</span>
-                    <span className="hist-meta">{b.avisos_count} avisos · {new Date(b.created_at).toLocaleString('es-ES')}</span>
+                    <span className="hist-meta">
+                      {b.avisos_count} avisos · {new Date(b.created_at).toLocaleString('es-ES')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-x"
+                    disabled={busy}
+                    onClick={(e) => eliminarLote(b, e)}
+                    title="Eliminar de la nube"
+                    aria-label={`Eliminar ${b.nombre} de la nube`}
+                  >
+                    ×
                   </button>
                 </li>
               ))}
