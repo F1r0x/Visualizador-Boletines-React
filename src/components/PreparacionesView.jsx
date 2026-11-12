@@ -100,16 +100,48 @@ export default function PreparacionesView() {
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroModelo, setFiltroModelo] = useState('')
   const [cloudBusy, setCloudBusy] = useState(false)
-  const [lightbox, setLightbox] = useState(null)
+  const [lightboxIndex, setLightboxIndex] = useState(null)
   const fileRef = useRef(null)
+  const touchStartX = useRef(null)
 
   const selected = draft || list.find((p) => p.id === selectedId) || null
   const refresh = () => setList(listPreparaciones())
 
+  const galleryImages = useMemo(() => {
+    const listAdj = draft?.adjuntos || []
+    return listAdj
+      .filter((a) => a.tipo === 'imagen' && a.dataUrl)
+      .map((a) => ({ id: a.id, src: a.dataUrl, nombre: a.nombre || 'Foto' }))
+  }, [draft?.adjuntos])
+
+  const lightboxItem =
+    lightboxIndex != null && galleryImages[lightboxIndex]
+      ? galleryImages[lightboxIndex]
+      : null
+
+  const openGalleryAt = (adjuntoId) => {
+    const idx = galleryImages.findIndex((g) => g.id === adjuntoId)
+    setLightboxIndex(idx >= 0 ? idx : 0)
+  }
+
+  const galleryPrev = () => {
+    if (!galleryImages.length) return
+    setLightboxIndex((i) =>
+      i == null ? 0 : (i - 1 + galleryImages.length) % galleryImages.length
+    )
+  }
+
+  const galleryNext = () => {
+    if (!galleryImages.length) return
+    setLightboxIndex((i) => (i == null ? 0 : (i + 1) % galleryImages.length))
+  }
+
   useEffect(() => {
-    if (!lightbox) return
+    if (lightboxIndex == null) return
     const onKey = (e) => {
-      if (e.key === 'Escape') setLightbox(null)
+      if (e.key === 'Escape') setLightboxIndex(null)
+      if (e.key === 'ArrowLeft') galleryPrev()
+      if (e.key === 'ArrowRight') galleryNext()
     }
     window.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
@@ -118,7 +150,18 @@ export default function PreparacionesView() {
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
-  }, [lightbox])
+  }, [lightboxIndex, galleryImages.length])
+
+  useEffect(() => {
+    if (lightboxIndex == null) return
+    if (!galleryImages.length) {
+      setLightboxIndex(null)
+      return
+    }
+    if (lightboxIndex >= galleryImages.length) {
+      setLightboxIndex(galleryImages.length - 1)
+    }
+  }, [galleryImages.length, lightboxIndex])
 
   const marcasDisponibles = useMemo(() => {
     const s = new Set()
@@ -735,8 +778,8 @@ export default function PreparacionesView() {
                     </button>
                   </div>
                   <p className="prep-hint">
-                    Las miniaturas se cargan al hacerse visibles. Pulsa una foto para verla a
-                    tamaño completo.
+                    Pulsa una foto para abrir la galería. Desliza o usa las flechas para pasar
+                    entre fotos.
                   </p>
                   {(draft.adjuntos || []).length === 0 ? (
                     <p className="hist-empty">Sin adjuntos.</p>
@@ -748,12 +791,7 @@ export default function PreparacionesView() {
                             <button
                               type="button"
                               className="prep-thumb-btn"
-                              onClick={() =>
-                                setLightbox({
-                                  src: a.dataUrl,
-                                  nombre: a.nombre || 'Foto',
-                                })
-                              }
+                              onClick={() => openGalleryAt(a.id)}
                               title="Ver en grande"
                             >
                               <LazyImage
@@ -794,34 +832,99 @@ export default function PreparacionesView() {
         </section>
       </div>
 
-      {lightbox && (
+      {lightboxItem && (
         <div
           className="prep-lightbox"
           role="dialog"
           aria-modal="true"
-          aria-label={lightbox.nombre}
-          onClick={() => setLightbox(null)}
+          aria-label={lightboxItem.nombre}
+          onClick={() => setLightboxIndex(null)}
+          onTouchStart={(e) => {
+            touchStartX.current = e.changedTouches[0]?.clientX ?? null
+          }}
+          onTouchEnd={(e) => {
+            const start = touchStartX.current
+            touchStartX.current = null
+            if (start == null) return
+            const end = e.changedTouches[0]?.clientX
+            if (end == null) return
+            const dx = end - start
+            if (Math.abs(dx) < 50) return
+            if (dx < 0) galleryNext()
+            else galleryPrev()
+          }}
         >
           <button
             type="button"
             className="prep-lightbox-close"
-            onClick={() => setLightbox(null)}
+            onClick={() => setLightboxIndex(null)}
             aria-label="Cerrar"
           >
             ×
           </button>
+
+          {galleryImages.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="prep-lightbox-nav prep-lightbox-prev"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  galleryPrev()
+                }}
+                aria-label="Anterior"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="prep-lightbox-nav prep-lightbox-next"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  galleryNext()
+                }}
+                aria-label="Siguiente"
+              >
+                ›
+              </button>
+            </>
+          )}
+
           <img
-            src={lightbox.src}
-            alt={lightbox.nombre}
+            key={lightboxItem.id || lightboxIndex}
+            src={lightboxItem.src}
+            alt={lightboxItem.nombre}
             className="prep-lightbox-img"
             decoding="async"
             onClick={(e) => e.stopPropagation()}
+            draggable={false}
           />
-          {lightbox.nombre && (
-            <p className="prep-lightbox-caption" onClick={(e) => e.stopPropagation()}>
-              {lightbox.nombre}
-            </p>
-          )}
+
+          <div className="prep-lightbox-footer" onClick={(e) => e.stopPropagation()}>
+            {galleryImages.length > 1 && (
+              <p className="prep-lightbox-counter">
+                {lightboxIndex + 1} / {galleryImages.length}
+              </p>
+            )}
+            {lightboxItem.nombre && (
+              <p className="prep-lightbox-caption">{lightboxItem.nombre}</p>
+            )}
+            {galleryImages.length > 1 && (
+              <div className="prep-lightbox-dots" role="tablist" aria-label="Fotos">
+                {galleryImages.map((g, i) => (
+                  <button
+                    key={g.id || i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === lightboxIndex}
+                    className={`prep-lightbox-dot ${i === lightboxIndex ? 'active' : ''}`}
+                    onClick={() => setLightboxIndex(i)}
+                    title={`Foto ${i + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
