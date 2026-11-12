@@ -1,6 +1,6 @@
 const KEY = 'boletines-preparaciones-v1'
 const MAX_ENTRIES = 40
-const MAX_IMG_BYTES = 450_000
+const MAX_IMG_BYTES = 450_000 // ~450 KB por imagen en dataURL
 
 function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -32,6 +32,51 @@ export function getPreparacion(id) {
   return listPreparaciones().find((p) => p.id === id) || null
 }
 
+/** Normaliza nº de aviso para comparar (solo dígitos) */
+export function normalizeAvisoNum(v) {
+  return String(v ?? '').replace(/\D/g, '')
+}
+
+export function matchAvisoRef(avisoRef, avisoOrNum) {
+  const ref = normalizeAvisoNum(avisoRef)
+  if (!ref) return false
+  const num =
+    typeof avisoOrNum === 'object' && avisoOrNum
+      ? normalizeAvisoNum(avisoOrNum.aviso ?? avisoOrNum.orden)
+      : normalizeAvisoNum(avisoOrNum)
+  return !!num && ref === num
+}
+
+/** Fichas vinculadas a un nº de aviso de boletín */
+export function preparacionesPorAviso(avisoOrNum) {
+  return listPreparaciones().filter((p) => matchAvisoRef(p.avisoRef, avisoOrNum))
+}
+
+/** Fichas con cita propia en una fecha YMD */
+export function preparacionesPorFecha(ymd) {
+  if (!ymd) return []
+  return listPreparaciones().filter((p) => (p.citaFecha || '') === ymd)
+}
+
+/**
+ * Fichas que deben mostrarse un día en el calendario:
+ * - con citaFecha === ymd, o
+ * - vinculadas a un aviso que ese día tiene cita
+ */
+export function preparacionesParaDia(ymd, avisoToFecha = null) {
+  if (!ymd) return []
+  const list = listPreparaciones()
+  return list.filter((p) => {
+    if ((p.citaFecha || '') === ymd) return true
+    if (!p.avisoRef || !avisoToFecha) return false
+    const key = normalizeAvisoNum(p.avisoRef)
+    if (!key) return false
+    const fechaAviso =
+      avisoToFecha instanceof Map ? avisoToFecha.get(key) : avisoToFecha[key]
+    return fechaAviso === ymd
+  })
+}
+
 export function createPreparacion(partial = {}) {
   const now = new Date().toISOString()
   const item = {
@@ -41,6 +86,8 @@ export function createPreparacion(partial = {}) {
     modelo: partial.modelo || '',
     tipo: partial.tipo || '',
     avisoRef: partial.avisoRef || '',
+    citaFecha: partial.citaFecha || '',
+    citaHora: partial.citaHora || '',
     notas: partial.notas || '',
     piezas: Array.isArray(partial.piezas) ? partial.piezas : [],
     checklist: Array.isArray(partial.checklist)
@@ -80,6 +127,7 @@ export function deletePreparacion(id) {
   return list
 }
 
+/** Comprime una imagen File a dataURL JPEG con límite de tamaño */
 export function fileToDataUrlCompressed(file, maxSide = 1280, quality = 0.72) {
   return new Promise((resolve, reject) => {
     if (!file || !file.type?.startsWith('image/')) {
