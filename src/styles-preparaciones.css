@@ -1,0 +1,8 @@
+/* Filtros y toolbar de preparaciones (complemento a index.css) */
+.prep-toolbar-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.prep-filters {
+  display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center;
+  margin-bottom: 0.85rem;
+}
+.prep-filters .search-input { flex: 1 1 12rem; min-width: 10rem; }
+.prep-filters .filter-select { max-width: 11rem; }

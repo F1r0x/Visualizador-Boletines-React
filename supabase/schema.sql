@@ -19,6 +19,8 @@ create table if not exists public.avisos (
 );
 
 create index if not exists avisos_aviso_key_idx on public.avisos (aviso_key);
+create index if not exists avisos_payload_nombre_idx on public.avisos
+  ((payload->'cliente'->>'nombre'));
 
 create table if not exists public.aviso_meta (
   aviso_key text primary key,
@@ -46,3 +48,31 @@ create policy "avisos_all" on public.avisos for all using (true) with check (tru
 
 drop policy if exists "meta_all" on public.aviso_meta;
 create policy "meta_all" on public.aviso_meta for all using (true) with check (true);
+
+-- —— Preparaciones ——
+create table if not exists public.preparaciones (
+  id uuid primary key default gen_random_uuid(),
+  local_id text not null unique,
+  titulo text not null default '',
+  marca text not null default '',
+  modelo text not null default '',
+  tipo text not null default '',
+  aviso_ref text not null default '',
+  notas text not null default '',
+  piezas jsonb not null default '[]'::jsonb,
+  checklist jsonb not null default '[]'::jsonb,
+  adjuntos jsonb not null default '[]'::jsonb,
+  adjuntos_truncados boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists preparaciones_marca_idx on public.preparaciones (marca);
+create index if not exists preparaciones_modelo_idx on public.preparaciones (modelo);
+create index if not exists preparaciones_tipo_idx on public.preparaciones (tipo);
+create index if not exists preparaciones_aviso_ref_idx on public.preparaciones (aviso_ref);
+create index if not exists preparaciones_updated_idx on public.preparaciones (updated_at desc);
+
+alter table public.preparaciones enable row level security;
+drop policy if exists "preparaciones_all" on public.preparaciones;
+create policy "preparaciones_all" on public.preparaciones for all using (true) with check (true);
