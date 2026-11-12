@@ -186,3 +186,135 @@ export function labelCliente(payload) {
     `Aviso ${payload?.aviso || payload?.orden || ''}`
   )
 }
+
+// ——— Preparaciones (fichas de reparación) ———
+
+const PREP_ADJ_MAX = 900_000
+
+function preparacionToRow(prep) {
+  let adjuntos = Array.isArray(prep.adjuntos) ? prep.adjuntos : []
+  let truncados = false
+  const size = JSON.stringify(adjuntos).length
+  if (size > PREP_ADJ_MAX) {
+    adjuntos = adjuntos.map((a) => {
+      if (a?.tipo === 'imagen' && a.dataUrl) {
+        truncados = true
+        return {
+          id: a.id,
+          tipo: 'imagen',
+          nombre: a.nombre || 'foto',
+          mime: a.mime,
+          localOnly: true,
+        }
+      }
+      return a
+    })
+  }
+  return {
+    local_id: prep.id,
+    titulo: prep.titulo || '',
+    marca: prep.marca || '',
+    modelo: prep.modelo || '',
+    tipo: prep.tipo || '',
+    aviso_ref: prep.avisoRef || '',
+    notas: prep.notas || '',
+    piezas: prep.piezas || [],
+    checklist: prep.checklist || [],
+    adjuntos,
+    adjuntos_truncados: truncados,
+    updated_at: new Date().toISOString(),
+  }
+}
+
+function rowToPreparacion(row) {
+  return {
+    id: row.local_id || row.id,
+    cloudId: row.id,
+    titulo: row.titulo || '',
+    marca: row.marca || '',
+    modelo: row.modelo || '',
+    tipo: row.tipo || '',
+    avisoRef: row.aviso_ref || '',
+    notas: row.notas || '',
+    piezas: row.piezas || [],
+    checklist: row.checklist || [],
+    adjuntos: row.adjuntos || [],
+    adjuntosTruncados: !!row.adjuntos_truncados,
+    creado: row.created_at,
+    actualizado: row.updated_at,
+  }
+}
+
+export async function cloudUpsertPreparacion(prep) {
+  if (!supabase) throw new Error('Supabase no configurado')
+  if (!prep?.id) throw new Error('Preparación sin id')
+  const row = preparacionToRow(prep)
+  const { data, error } = await supabase
+    .from('preparaciones')
+    .upsert(row, { onConflict: 'local_id' })
+    .select()
+    .single()
+  if (error) throw error
+  return rowToPreparacion(data)
+}
+
+export async function cloudListPreparaciones(limit = 80) {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('preparaciones')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data || []).map(rowToPreparacion)
+}
+
+export async function cloudSearchPreparaciones(filters = {}) {
+  if (!supabase) return []
+  let query = supabase
+    .from('preparaciones')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(60)
+
+  if (filters.marca?.trim()) {
+    query = query.ilike('marca', `%${filters.marca.trim()}%`)
+  }
+  if (filters.tipo?.trim()) {
+    query = query.ilike('tipo', `%${filters.tipo.trim()}%`)
+  }
+  if (filters.modelo?.trim()) {
+    query = query.ilike('modelo', `%${filters.modelo.trim()}%`)
+  }
+
+  const q = filters.q?.trim()
+  if (q) {
+    query = query.or(
+      `titulo.ilike.%${q}%,marca.ilike.%${q}%,modelo.ilike.%${q}%,tipo.ilike.%${q}%,aviso_ref.ilike.%${q}%,notas.ilike.%${q}%`
+    )
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data || []).map(rowToPreparacion)
+}
+
+export async function cloudDeletePreparacion(localId) {
+  if (!supabase || !localId) return
+  const { error } = await supabase
+    .from('preparaciones')
+    .delete()
+    .eq('local_id', localId)
+  if (error) throw error
+}
+
+export async function cloudGetPreparacion(localId) {
+  if (!supabase || !localId) return null
+  const { data, error } = await supabase
+    .from('preparaciones')
+    .select('*')
+    .eq('local_id', localId)
+    .maybeSingle()
+  if (error) throw error
+  return data ? rowToPreparacion(data) : null
+}
