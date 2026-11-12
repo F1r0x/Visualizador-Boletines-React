@@ -135,7 +135,21 @@ export default function App() {
 
   const borrarHistorial = (id, e) => {
     e.stopPropagation()
+    const entry = historial.find((h) => h.id === id)
+    const nombre = entry?.nombre || 'este boletín'
+    const n = entry?.count ?? entry?.avisos?.length ?? 0
+    if (
+      !window.confirm(
+        `¿Eliminar del historial «${nombre}»${n ? ` (${n} avisos)` : ''}?\n\nEsta acción no se puede deshacer.`
+      )
+    ) {
+      return
+    }
     setHistorial(deleteHistorialEntry(id))
+    setStatus({
+      msg: `Boletín eliminado del historial: ${nombre}.`,
+      type: 'success',
+    })
   }
 
   const eliminarAviso = (aviso) => {
@@ -380,7 +394,15 @@ export default function App() {
                       <span className="hist-name">{h.nombre}</span>
                       <span className="hist-meta">{h.count} avisos · {new Date(h.fecha).toLocaleString('es-ES')}</span>
                     </button>
-                    <button type="button" className="btn-x" onClick={(e) => borrarHistorial(h.id, e)} title="Eliminar">×</button>
+                    <button
+                      type="button"
+                      className="btn-x"
+                      onClick={(e) => borrarHistorial(h.id, e)}
+                      title="Eliminar del historial"
+                      aria-label={`Eliminar ${h.nombre} del historial`}
+                    >
+                      ×
+                    </button>
                   </li>
                 ))}
               </ul>
