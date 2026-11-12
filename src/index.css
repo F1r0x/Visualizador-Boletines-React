@@ -1,4 +1,6 @@
-:root {
+/* Tema oscuro (por defecto y data-theme="dark") */
+:root,
+html[data-theme='dark'] {
   --bg: #0c1118;
   --card: #151c28;
   --border: #2a3648;
@@ -15,7 +17,56 @@
   --prep: #14b8a6;
   --prep-bg: rgba(20, 184, 166, 0.12);
   --prep-border: rgba(45, 212, 191, 0.4);
+  color-scheme: dark;
 }
+
+/* Tema claro */
+html[data-theme='light'] {
+  --bg: #f0f3f8;
+  --card: #ffffff;
+  --border: #d0d7e2;
+  --text: #152033;
+  --muted: #5a6b82;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --success: #16a34a;
+  --warning: #d97706;
+  --section: #e8eef6;
+  --shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  --prep: #0d9488;
+  --prep-bg: rgba(13, 148, 136, 0.1);
+  --prep-border: rgba(13, 148, 136, 0.35);
+  color-scheme: light;
+}
+
+.theme-control { display: inline-flex; align-items: center; gap: 0.4rem; }
+.theme-label {
+  font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted);
+}
+.theme-select {
+  background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text); padding: 0.3rem 0.65rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+}
+.theme-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.header-actions-top { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
+.theme-bar-floating { position: fixed; top: 0.75rem; right: 0.75rem; z-index: 50; }
+
+html[data-theme='light'] .aviso-prep-btn {
+  background: #0f766e !important; border-color: #0d9488 !important; color: #fff !important;
+}
+html[data-theme='light'] .btn-wa,
+html[data-theme='light'] .aviso-header .aviso-num,
+html[data-theme='light'] .maps-btn { color: #fff; }
+html[data-theme='light'] .cita-origen.boletin {
+  background: rgba(2, 132, 199, 0.12); color: #0369a1; border-color: rgba(2, 132, 199, 0.35);
+}
+html[data-theme='light'] .cita-origen.manual {
+  background: rgba(124, 58, 237, 0.1); color: #6d28d9; border-color: rgba(124, 58, 237, 0.3);
+}
+html[data-theme='light'] .aviso-preps h4,
+html[data-theme='light'] .aviso-preps-empty strong { color: #0f766e; }
+html[data-theme='light'] .aviso-card:hover { border-color: #b6c2d4; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -507,7 +558,6 @@ header p { color: var(--muted); margin-top: 0.3rem; font-size: 0.9rem; }
 .aviso-ops .dl-compact dt { color: var(--muted); font-weight: 600; }
 .aviso-ops .dl-compact dd { margin: 0; }
 
-/* Fichas de preparación en el aviso */
 .aviso-preps {
   margin: 0.85rem 1.2rem 0.35rem;
   padding: 0.75rem 0.95rem;
@@ -565,7 +615,6 @@ header p { color: var(--muted); margin-top: 0.3rem; font-size: 0.9rem; }
 }
 .aviso-prep-btn:hover { filter: brightness(1.08); }
 
-/* Recordatorios */
 .reminders-wrap { margin-bottom: 1rem; }
 .reminders-toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
 .reminders-cfg {
@@ -595,7 +644,6 @@ header p { color: var(--muted); margin-top: 0.3rem; font-size: 0.9rem; }
 }
 .rem-link:hover { color: var(--accent); }
 
-/* Offline */
 .offline-bar {
   display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center;
   justify-content: space-between; font-size: 0.85rem; font-weight: 600;
@@ -614,7 +662,6 @@ header p { color: var(--muted); margin-top: 0.3rem; font-size: 0.9rem; }
   font-size: 0.8rem;
 }
 
-/* Preparaciones (layout base; detalle en styles-preparaciones.css) */
 .prep-wrap { margin-bottom: 1.5rem; }
 .prep-toolbar {
   display: flex; flex-wrap: wrap; justify-content: space-between;
@@ -667,7 +714,7 @@ footer {
 @media (max-width: 900px) {
   body { padding: 1rem; }
   .header-top > div:first-child { text-align: center; }
-  .user-bar { margin: 0 auto; }
+  .header-actions-top { width: 100%; justify-content: center; }
   .btn { width: 100%; justify-content: center; }
   .aviso-body-primary { grid-template-columns: 1fr; }
   .aviso-ops-row { grid-template-columns: 1fr; }
