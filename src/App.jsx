@@ -5,6 +5,7 @@ import CloudPanel from './components/CloudPanel'
 import LoginScreen from './components/LoginScreen'
 import RemindersBanner from './components/RemindersBanner'
 import OfflineBanner from './components/OfflineBanner'
+import PreparacionesView from './components/PreparacionesView'
 import { useAuth } from './hooks/useAuth'
 import { normalizarRespuestaN8n, val } from './utils/parseAvisos'
 import { aplicarCitasDesdeHorario } from './utils/citasDesdeHorario'
@@ -77,7 +78,6 @@ export default function App() {
     }
   }, [])
 
-  // Si arrancamos offline y no hay avisos, restaurar caché
   useEffect(() => {
     if (!isOnline() && avisos.length === 0) {
       const cache = cargarCacheOffline()
@@ -153,7 +153,6 @@ export default function App() {
     [avisos, historial]
   )
 
-  // Snapshot offline (citas de hoy o lote actual)
   useEffect(() => {
     if (avisosCalendario.length > 0) {
       guardarCacheOffline(avisosCalendario)
@@ -409,6 +408,7 @@ export default function App() {
         <div className="vista-toggle">
           <button type="button" className={vista === 'lista' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('lista')}>Lista</button>
           <button type="button" className={vista === 'calendario' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('calendario')}>Calendario</button>
+          <button type="button" className={vista === 'preparaciones' ? 'btn-sm active' : 'btn-sm'} onClick={() => setVista('preparaciones')}>Preparaciones</button>
         </div>
         {vista === 'lista' && avisos.length > 0 && (
           <>
@@ -462,6 +462,8 @@ export default function App() {
         </div>
       )}
 
+      {vista === 'preparaciones' && <PreparacionesView />}
+
       {vista === 'calendario' && (
         <CalendarioView
           avisos={avisosCalendario}
@@ -482,7 +484,7 @@ export default function App() {
       )}
 
       <div className="avisos">
-        {vista === 'calendario' ? null : avisos.length === 0 ? (
+        {vista === 'calendario' || vista === 'preparaciones' ? null : avisos.length === 0 ? (
           <div className="empty-state">
             <p>
               Selecciona un PDF y pulsa <strong>Procesar PDF</strong>
