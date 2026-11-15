@@ -1,6 +1,6 @@
 const KEY = 'boletines-preparaciones-v1'
 const MAX_ENTRIES = 40
-const MAX_IMG_BYTES = 450_000 // ~450 KB por imagen en dataURL
+const MAX_IMG_BYTES = 450_000
 
 function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -32,7 +32,6 @@ export function getPreparacion(id) {
   return listPreparaciones().find((p) => p.id === id) || null
 }
 
-/** Normaliza nº de aviso para comparar (solo dígitos) */
 export function normalizeAvisoNum(v) {
   return String(v ?? '').replace(/\D/g, '')
 }
@@ -47,28 +46,24 @@ export function matchAvisoRef(avisoRef, avisoOrNum) {
   return !!num && ref === num
 }
 
-/** Fichas vinculadas a un nº de aviso de boletín */
 export function preparacionesPorAviso(avisoOrNum) {
   return listPreparaciones().filter((p) => matchAvisoRef(p.avisoRef, avisoOrNum))
 }
 
-/** Fichas con cita propia en una fecha YMD */
 export function preparacionesPorFecha(ymd) {
   if (!ymd) return []
   return listPreparaciones().filter((p) => (p.citaFecha || '') === ymd)
 }
 
-/**
- * Fichas que deben mostrarse un día en el calendario:
- * - con citaFecha === ymd, o
- * - vinculadas a un aviso que ese día tiene cita (mapa aviso→ymd)
- * @param {string} ymd
- * @param {Map<string, string>|Record<string,string>} [avisoToFecha] numAviso → ymd
- */
+export function isPrepCompletada(p) {
+  return !!(p && (p.completada === true || p.estado === 'completada'))
+}
+
 export function preparacionesParaDia(ymd, avisoToFecha = null) {
   if (!ymd) return []
   const list = listPreparaciones()
   return list.filter((p) => {
+    if (isPrepCompletada(p)) return false
     if ((p.citaFecha || '') === ymd) return true
     if (!p.avisoRef || !avisoToFecha) return false
     const key = normalizeAvisoNum(p.avisoRef)
@@ -81,6 +76,7 @@ export function preparacionesParaDia(ymd, avisoToFecha = null) {
 
 export function createPreparacion(partial = {}) {
   const now = new Date().toISOString()
+  const completada = partial.completada === true || partial.estado === 'completada'
   const item = {
     id: uid(),
     titulo: partial.titulo || 'Nueva preparación',
@@ -88,7 +84,6 @@ export function createPreparacion(partial = {}) {
     modelo: partial.modelo || '',
     tipo: partial.tipo || '',
     avisoRef: partial.avisoRef || '',
-    /** Cita propia (fichas sueltas o refuerzo del aviso) */
     citaFecha: partial.citaFecha || '',
     citaHora: partial.citaHora || '',
     notas: partial.notas || '',
@@ -101,6 +96,8 @@ export function createPreparacion(partial = {}) {
           { id: uid(), text: 'Manual / esquema revisado', done: false },
         ],
     adjuntos: Array.isArray(partial.adjuntos) ? partial.adjuntos : [],
+    completada,
+    completadaEn: completada ? partial.completadaEn || now : partial.completadaEn || '',
     creado: now,
     actualizado: now,
   }
@@ -109,21 +106,60 @@ export function createPreparacion(partial = {}) {
   return item
 }
 
-/**
- * Crea una ficha de preparación vinculada a un aviso de boletín,
- * rellenando marca, modelo, tipo, nº aviso, piezas del pedido, notas y cita si hay.
- * @param {object} aviso — JSON del aviso (n8n)
- * @param {object} [meta] — meta local (citaFecha, citaHora, piezas, nota…)
- */
+export function setPreparacionCompletada(id, completada = true) {
+  const now = new Date().toISOString()
+  return updatePreparacion(id, {
+    completada: !!completada,
+    completadaEn: completada ? now : '',
+    cerradaPorAviso: false,
+  })
+}
+
+export function syncPreparacionesConAviso(avisoOrNum, completada) {
+  const ref = normalizeAvisoNum(
+    typeof avisoOrNum === 'object' && avisoOrNum
+      ? avisoOrNum.aviso ?? avisoOrNum.orden
+      : avisoOrNum
+  )
+  if (!ref) return []
+  const now = new Date().toISOString()
+  const list = listPreparaciones()
+  let changed = false
+  const updated = list.map((p) => {
+    if (!matchAvisoRef(p.avisoRef, ref)) return p
+    if (completada) {
+      if (isPrepCompletada(p)) return p
+      changed = true
+      return {
+        ...p,
+        completada: true,
+        completadaEn: now,
+        cerradaPorAviso: true,
+        actualizado: now,
+      }
+    }
+    if (!isPrepCompletada(p)) return p
+    if (p.cerradaPorAviso !== true) return p
+    changed = true
+    return {
+      ...p,
+      completada: false,
+      completadaEn: '',
+      cerradaPorAviso: false,
+      actualizado: now,
+    }
+  })
+  if (changed) saveAll(updated)
+  return updated.filter((p) => matchAvisoRef(p.avisoRef, ref))
+}
+
 export function createPreparacionFromAviso(aviso, meta = {}) {
   if (!aviso) throw new Error('Falta el aviso')
-
   const num = String(aviso.aviso ?? aviso.orden ?? '').replace(/\D/g, '') || ''
   const marca = String(aviso.aparato?.marca || '').trim()
   const modelo = String(aviso.aparato?.modelo || '').trim()
   const tipo = String(aviso.aparato?.tipo || '').trim()
   const cliente = String(aviso.cliente?.nombre || '').trim()
-
   const tituloParts = [
     num ? `#${num}` : null,
     marca || modelo ? [marca, modelo].filter(Boolean).join(' ') : null,
@@ -132,7 +168,6 @@ export function createPreparacionFromAviso(aviso, meta = {}) {
   const titulo = tituloParts.length
     ? `Prep ${tituloParts.join(' · ')}`
     : 'Nueva preparación'
-
   const notasLines = []
   if (aviso.averia?.causa) notasLines.push(`Causa: ${aviso.averia.causa}`)
   if (aviso.averia?.sintoma) notasLines.push(`Síntoma: ${aviso.averia.sintoma}`)
@@ -144,7 +179,6 @@ export function createPreparacionFromAviso(aviso, meta = {}) {
   if (aviso.horario) notasLines.push(`Horario boletín: ${aviso.horario}`)
   if (aviso.estado) notasLines.push(`Estado: ${aviso.estado}`)
   if (meta.nota) notasLines.push(`Nota técnico: ${meta.nota}`)
-
   const piezas = []
   const seen = new Set()
   const pushPieza = (ref, descripcion) => {
@@ -154,14 +188,8 @@ export function createPreparacionFromAviso(aviso, meta = {}) {
     const key = `${r}|${d}`.toLowerCase()
     if (seen.has(key)) return
     seen.add(key)
-    piezas.push({
-      id: uid(),
-      ref: r,
-      descripcion: d,
-      cantidad: 1,
-    })
+    piezas.push({ id: uid(), ref: r, descripcion: d, cantidad: 1 })
   }
-
   const pedidoPiezas = aviso.pedido?.piezas
   if (Array.isArray(pedidoPiezas)) {
     pedidoPiezas.forEach((p) => {
@@ -175,7 +203,6 @@ export function createPreparacionFromAviso(aviso, meta = {}) {
       else pushPieza(p.ref || p.referencia, p.descripcion || p.nombre || p)
     })
   }
-
   return createPreparacion({
     titulo,
     marca,
@@ -210,7 +237,6 @@ export function deletePreparacion(id) {
   return list
 }
 
-/** Comprime una imagen File a dataURL JPEG con límite de tamaño */
 export function fileToDataUrlCompressed(file, maxSide = 1280, quality = 0.72) {
   return new Promise((resolve, reject) => {
     if (!file || !file.type?.startsWith('image/')) {
@@ -239,11 +265,7 @@ export function fileToDataUrlCompressed(file, maxSide = 1280, quality = 0.72) {
           dataUrl = canvas.toDataURL('image/jpeg', q)
         }
         if (dataUrl.length > MAX_IMG_BYTES * 1.4) {
-          reject(
-            new Error(
-              'La imagen sigue siendo demasiado grande. Usa una foto más ligera.'
-            )
-          )
+          reject(new Error('La imagen sigue siendo demasiado grande. Usa una foto más ligera.'))
           return
         }
         resolve({
