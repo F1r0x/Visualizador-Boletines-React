@@ -57,18 +57,9 @@ const DEFAULT_META = {
   inicioVisita: '',
   finVisita: '',
   piezas: [],
-  /** YYYY-MM-DD */
   citaFecha: '',
-  /** HH:MM */
   citaHora: '',
-  /** Mañana | Tarde | Urgencia | '' */
   franja: '',
-  /**
-   * Origen de la cita:
-   * - 'boletin' → hora/fecha del PDF (preferente)
-   * - 'manual'  → elegida por el técnico
-   * - ''        → sin cita
-   */
   citaOrigen: '',
 }
 
@@ -82,8 +73,24 @@ export function setMeta(aviso, patch) {
   const all = loadAll()
   const key = avisoKey(aviso)
   if (!key) return
-  all[key] = { ...getMeta(aviso), ...patch }
+  const antes = getMeta(aviso)
+  all[key] = {
+    ...antes,
+    ...patch,
+    _updatedAt: new Date().toISOString(),
+  }
   saveAll(all)
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('boletines-meta-changed', {
+          detail: { key, antes, despues: all[key], patch },
+        })
+      )
+    }
+  } catch {
+    /* ignore */
+  }
   return all[key]
 }
 
