@@ -1,1 +1,310 @@
-PLACEHOLDER
+const KEY = 'boletines-preparaciones-v1'
+const MAX_ENTRIES = 40
+const MAX_IMG_BYTES = 450_000
+
+function uid() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+export function listPreparaciones() {
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+}
+
+function saveAll(list) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX_ENTRIES)))
+  } catch (e) {
+    console.warn('No se pudo guardar preparaciones', e)
+    throw new Error('No hay espacio suficiente para guardar preparaciones.')
+  }
+}
+
+export function getPreparacion(id) {
+  return listPreparaciones().find((p) => p.id === id) || null
+}
+
+export function normalizeAvisoNum(v) {
+  return String(v ?? '').replace(/\D/g, '')
+}
+
+export function matchAvisoRef(avisoRef, avisoOrNum) {
+  const ref = normalizeAvisoNum(avisoRef)
+  if (!ref) return false
+  const num =
+    typeof avisoOrNum === 'object' && avisoOrNum
+      ? normalizeAvisoNum(avisoOrNum.aviso ?? avisoOrNum.orden)
+      : normalizeAvisoNum(avisoOrNum)
+  return !!num && ref === num
+}
+
+export function preparacionesPorAviso(avisoOrNum) {
+  return listPreparaciones().filter((p) => matchAvisoRef(p.avisoRef, avisoOrNum))
+}
+
+export function preparacionesPorFecha(ymd) {
+  if (!ymd) return []
+  return listPreparaciones().filter((p) => (p.citaFecha || '') === ymd)
+}
+
+export function isPrepCompletada(p) {
+  return !!(p && (p.completada === true || p.estado === 'completada'))
+}
+
+export function preparacionesParaDia(ymd, avisoToFecha = null) {
+  if (!ymd) return []
+  const list = listPreparaciones()
+  return list.filter((p) => {
+    if (isPrepCompletada(p)) return false
+    if ((p.citaFecha || '') === ymd) return true
+    if (!p.avisoRef || !avisoToFecha) return false
+    const key = normalizeAvisoNum(p.avisoRef)
+    if (!key) return false
+    const fechaAviso =
+      avisoToFecha instanceof Map ? avisoToFecha.get(key) : avisoToFecha[key]
+    return fechaAviso === ymd
+  })
+}
+
+export function createPreparacion(partial = {}) {
+  const now = new Date().toISOString()
+  const completada = partial.completada === true || partial.estado === 'completada'
+  const item = {
+    id: uid(),
+    titulo: partial.titulo || 'Nueva preparación',
+    marca: partial.marca || '',
+    modelo: partial.modelo || '',
+    tipo: partial.tipo || '',
+    avisoRef: partial.avisoRef || '',
+    citaFecha: partial.citaFecha || '',
+    citaHora: partial.citaHora || '',
+    notas: partial.notas || '',
+    piezas: Array.isArray(partial.piezas) ? partial.piezas : [],
+    checklist: Array.isArray(partial.checklist)
+      ? partial.checklist
+      : [
+          { id: uid(), text: 'Pieza preparada / en furgoneta', done: false },
+          { id: uid(), text: 'Herramientas necesarias', done: false },
+          { id: uid(), text: 'Manual / esquema revisado', done: false },
+        ],
+    adjuntos: Array.isArray(partial.adjuntos) ? partial.adjuntos : [],
+    completada,
+    completadaEn: completada ? partial.completadaEn || now : partial.completadaEn || '',
+    creado: now,
+    actualizado: now,
+  }
+  const list = [item, ...listPreparaciones()]
+  saveAll(list)
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('boletines-prep-changed', {
+          detail: { id: item.id, antes: null, despues: item, accion: 'crear' },
+        })
+      )
+    }
+  } catch {}
+  return item
+}
+
+export function setPreparacionCompletada(id, completada = true) {
+  const now = new Date().toISOString()
+  return updatePreparacion(id, {
+    completada: !!completada,
+    completadaEn: completada ? now : '',
+    cerradaPorAviso: false,
+  })
+}
+
+export function syncPreparacionesConAviso(avisoOrNum, completada) {
+  const ref = normalizeAvisoNum(
+    typeof avisoOrNum === 'object' && avisoOrNum
+      ? avisoOrNum.aviso ?? avisoOrNum.orden
+      : avisoOrNum
+  )
+  if (!ref) return []
+  const now = new Date().toISOString()
+  const list = listPreparaciones()
+  let changed = false
+  const updated = list.map((p) => {
+    if (!matchAvisoRef(p.avisoRef, ref)) return p
+    if (completada) {
+      if (isPrepCompletada(p)) return p
+      changed = true
+      return { ...p, completada: true, completadaEn: now, cerradaPorAviso: true, actualizado: now }
+    }
+    if (!isPrepCompletada(p) || p.cerradaPorAviso !== true) return p
+    changed = true
+    return { ...p, completada: false, completadaEn: '', cerradaPorAviso: false, actualizado: now }
+  })
+  if (changed) saveAll(updated)
+  return updated.filter((p) => matchAvisoRef(p.avisoRef, ref))
+}
+
+export function createPreparacionFromAviso(aviso, meta = {}) {
+  if (!aviso) throw new Error('Falta el aviso')
+  const num = String(aviso.aviso ?? aviso.orden ?? '').replace(/\D/g, '') || ''
+  const marca = String(aviso.aparato?.marca || '').trim()
+  const modelo = String(aviso.aparato?.modelo || '').trim()
+  const tipo = String(aviso.aparato?.tipo || '').trim()
+  const cliente = String(aviso.cliente?.nombre || '').trim()
+  const tituloParts = [
+    num ? `#${num}` : null,
+    marca || modelo ? [marca, modelo].filter(Boolean).join(' ') : null,
+    cliente || null,
+  ].filter(Boolean)
+  const titulo = tituloParts.length ? `Prep ${tituloParts.join(' · ')}` : 'Nueva preparación'
+  const notasLines = []
+  if (aviso.averia?.causa) notasLines.push(`Causa: ${aviso.averia.causa}`)
+  if (aviso.averia?.sintoma) notasLines.push(`Síntoma: ${aviso.averia.sintoma}`)
+  if (aviso.averia?.diagnostico) notasLines.push(`Diagnóstico: ${aviso.averia.diagnostico}`)
+  if (aviso.direccion?.completa) {
+    const cp = aviso.direccion?.codigo_postal ? ` (${aviso.direccion.codigo_postal})` : ''
+    notasLines.push(`Dirección: ${aviso.direccion.completa}${cp}`)
+  }
+  if (meta.nota) notasLines.push(`Nota técnico: ${meta.nota}`)
+  const piezas = []
+  const seen = new Set()
+  const pushPieza = (ref, descripcion) => {
+    const r = String(ref || '').trim()
+    const d = String(descripcion || '').trim()
+    if (!r && !d) return
+    const key = `${r}|${d}`.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    piezas.push({ id: uid(), ref: r, descripcion: d, cantidad: 1 })
+  }
+  const pedidoPiezas = aviso.pedido?.piezas
+  if (Array.isArray(pedidoPiezas)) {
+    pedidoPiezas.forEach((p) => {
+      if (typeof p === 'string') pushPieza('', p)
+      else pushPieza(p.referencia || p.ref, p.descripcion || p.nombre || '')
+    })
+  }
+  if (Array.isArray(meta.piezas)) {
+    meta.piezas.forEach((p) => {
+      if (typeof p === 'string') pushPieza('', p)
+      else pushPieza(p.ref || p.referencia, p.descripcion || p.nombre || '')
+    })
+  }
+  return createPreparacion({
+    titulo,
+    marca,
+    modelo,
+    tipo,
+    avisoRef: num || String(aviso.aviso ?? ''),
+    citaFecha: meta.citaFecha || '',
+    citaHora: meta.citaHora || '',
+    notas: notasLines.join('\n'),
+    piezas,
+  })
+}
+
+export function updatePreparacion(id, patch) {
+  const list = listPreparaciones()
+  const i = list.findIndex((p) => p.id === id)
+  if (i < 0) return null
+  const antes = list[i]
+  list[i] = {
+    ...list[i],
+    ...patch,
+    id: list[i].id,
+    creado: list[i].creado,
+    actualizado: new Date().toISOString(),
+  }
+  saveAll(list)
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('boletines-prep-changed', {
+          detail: { id, antes, despues: list[i], patch, accion: 'actualizar' },
+        })
+      )
+    }
+  } catch {}
+  return list[i]
+}
+
+export function deletePreparacion(id) {
+  const list = listPreparaciones()
+  const victim = list.find((p) => p.id === id)
+  const next = list.filter((p) => p.id !== id)
+  saveAll(next)
+  try {
+    if (typeof window !== 'undefined' && victim) {
+      window.dispatchEvent(
+        new CustomEvent('boletines-prep-changed', {
+          detail: { id, antes: victim, despues: null, accion: 'eliminar' },
+        })
+      )
+    }
+  } catch {}
+  return next
+}
+
+export function fileToDataUrlCompressed(file, maxSide = 1280, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type?.startsWith('image/')) {
+      reject(new Error('Solo se admiten imágenes'))
+      return
+    }
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('Imagen no válida'))
+      img.onload = () => {
+        let { width, height } = img
+        const scale = Math.min(1, maxSide / Math.max(width, height))
+        width = Math.round(width * scale)
+        height = Math.round(height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        let q = quality
+        let dataUrl = canvas.toDataURL('image/jpeg', q)
+        while (dataUrl.length > MAX_IMG_BYTES && q > 0.35) {
+          q -= 0.08
+          dataUrl = canvas.toDataURL('image/jpeg', q)
+        }
+        if (dataUrl.length > MAX_IMG_BYTES * 1.4) {
+          reject(new Error('La imagen sigue siendo demasiado grande.'))
+          return
+        }
+        resolve({
+          id: uid(),
+          tipo: 'imagen',
+          nombre: file.name || 'foto.jpg',
+          mime: 'image/jpeg',
+          dataUrl,
+          size: dataUrl.length,
+        })
+      }
+      img.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+export function makeEnlaceAdjunto(url, nombre = '') {
+  const u = String(url || '').trim()
+  if (!u) throw new Error('Indica una URL')
+  return {
+    id: uid(),
+    tipo: /youtu\.?be|vimeo|video/i.test(u) ? 'video' : 'enlace',
+    nombre: nombre || u.slice(0, 60),
+    url: u,
+  }
+}
+
+export function emptyPieza() {
+  return { id: uid(), ref: '', descripcion: '', cantidad: 1 }
+}
