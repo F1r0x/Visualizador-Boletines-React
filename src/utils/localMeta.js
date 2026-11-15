@@ -8,6 +8,15 @@ export const ESTADOS = [
   'Terminado',
 ]
 
+/** Aviso cerrado / realizado (no aparece en lista activa por defecto) */
+export function isAvisoCompletado(metaOrEstado) {
+  const e =
+    typeof metaOrEstado === 'string'
+      ? metaOrEstado
+      : metaOrEstado?.estado || ''
+  return String(e).toLowerCase() === 'terminado'
+}
+
 export const CHECKLIST_ITEMS = [
   'Llegada',
   'Diagnóstico',
@@ -48,10 +57,18 @@ const DEFAULT_META = {
   inicioVisita: '',
   finVisita: '',
   piezas: [],
+  /** YYYY-MM-DD */
   citaFecha: '',
+  /** HH:MM */
   citaHora: '',
+  /** Mañana | Tarde | Urgencia | '' */
   franja: '',
-  /** 'boletin' | 'manual' | '' */
+  /**
+   * Origen de la cita:
+   * - 'boletin' → hora/fecha del PDF (preferente)
+   * - 'manual'  → elegida por el técnico
+   * - ''        → sin cita
+   */
   citaOrigen: '',
 }
 
@@ -70,6 +87,7 @@ export function setMeta(aviso, patch) {
   return all[key]
 }
 
+/** Elimina metadatos locales de un aviso */
 export function deleteMeta(aviso) {
   const all = loadAll()
   const key = avisoKey(aviso)
