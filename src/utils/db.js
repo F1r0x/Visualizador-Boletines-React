@@ -1,13 +1,10 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { avisoKey, getMeta, setMeta } from './localMeta'
+import { resolvePreparacionConflict, resolveMetaMap } from './conflictResolution'
 import { val } from './parseAvisos'
 
 export { isSupabaseConfigured }
 
-/**
- * Guarda un lote de avisos + meta en Supabase.
- * Acepta cloudSaveBatch(nombre, avisos) o cloudSaveBatch({ nombre, avisos }).
- */
 export async function cloudSaveBatch(nombreOrOpts, maybeAvisos) {
   if (!supabase) throw new Error('Supabase no configurado')
 
@@ -55,7 +52,7 @@ export async function cloudSaveBatch(nombreOrOpts, maybeAvisos) {
         cita_fecha: m.citaFecha || '',
         cita_hora: m.citaHora || '',
         franja: m.franja || '',
-        updated_at: new Date().toISOString(),
+        updated_at: m._updatedAt || new Date().toISOString(),
       }
     })
     .filter((r) => r.aviso_key)
@@ -123,40 +120,87 @@ export async function cloudLoadBatch(batchId) {
   return avisos
 }
 
-/** Sincroniza meta de los avisos actuales */
 export async function cloudSyncMeta(avisos) {
-  if (!supabase || !avisos?.length) return
-  const metas = avisos
-    .map((a) => {
-      const m = getMeta(a)
-      return {
-        aviso_key: avisoKey(a),
-        estado: m.estado || 'Pendiente',
-        nota: m.nota || '',
-        checklist: m.checklist || {},
-        inicio_visita: m.inicioVisita || '',
-        fin_visita: m.finVisita || '',
-        piezas: m.piezas || [],
-        cita_fecha: m.citaFecha || '',
-        cita_hora: m.citaHora || '',
-        franja: m.franja || '',
-        updated_at: new Date().toISOString(),
-      }
-    })
-    .filter((r) => r.aviso_key)
-  if (!metas.length) return
+  if (!supabase || !avisos?.length) return { synced: 0, conflicts: [] }
+  const keys = avisos.map((a) => avisoKey(a)).filter(Boolean)
+  if (!keys.length) return { synced: 0, conflicts: [] }
+
+  let remoteRows = []
+  try {
+    const { data, error } = await supabase
+      .from('aviso_meta')
+      .select('*')
+      .in('aviso_key', keys)
+    if (!error && data) remoteRows = data
+  } catch {
+    remoteRows = []
+  }
+
+  const remoteMap = {}
+  for (const r of remoteRows) {
+    remoteMap[r.aviso_key] = {
+      estado: r.estado || 'Pendiente',
+      nota: r.nota || '',
+      checklist: r.checklist || {},
+      inicioVisita: r.inicio_visita || '',
+      finVisita: r.fin_visita || '',
+      piezas: r.piezas || [],
+      citaFecha: r.cita_fecha || '',
+      citaHora: r.cita_hora || '',
+      franja: r.franja || '',
+      _updatedAt: r.updated_at || '',
+    }
+  }
+
+  const localMap = {}
+  for (const a of avisos) {
+    const k = avisoKey(a)
+    if (!k) continue
+    localMap[k] = getMeta(a)
+  }
+
+  const { result: merged, conflicts } = resolveMetaMap(localMap, remoteMap)
+
+  const metas = Object.entries(merged).map(([aviso_key, m]) => ({
+    aviso_key,
+    estado: m.estado || 'Pendiente',
+    nota: m.nota || '',
+    checklist: m.checklist || {},
+    inicio_visita: m.inicioVisita || '',
+    fin_visita: m.finVisita || '',
+    piezas: m.piezas || [],
+    cita_fecha: m.citaFecha || '',
+    cita_hora: m.citaHora || '',
+    franja: m.franja || '',
+    updated_at: m._updatedAt || new Date().toISOString(),
+  }))
+
+  if (!metas.length) return { synced: 0, conflicts }
+
   const { error } = await supabase
     .from('aviso_meta')
     .upsert(metas, { onConflict: 'aviso_key' })
   if (error) throw error
+
+  try {
+    const raw = localStorage.getItem('boletines-meta-v1')
+    const all = raw ? JSON.parse(raw) : {}
+    for (const [k, m] of Object.entries(merged)) {
+      all[k] = { ...all[k], ...m }
+    }
+    localStorage.setItem('boletines-meta-v1', JSON.stringify(all))
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('boletines-meta-changed', { detail: { bulk: true } }))
+    }
+  } catch {}
+
+  return { synced: metas.length, conflicts }
 }
 
-/** Alias de compatibilidad */
 export async function cloudSyncMetas(avisos) {
   return cloudSyncMeta(avisos)
 }
 
-/** Historial de clientes / búsqueda */
 export async function cloudSearchClientes(query) {
   if (!supabase || !query?.trim()) return []
   const q = query.trim()
@@ -180,17 +224,9 @@ export async function cloudSearchClientes(query) {
     return (all || []).filter((row) => {
       const p = row.payload || {}
       const blob = [
-        p.aviso,
-        p.orden,
-        p.cliente?.nombre,
-        p.cliente?.nif,
-        p.direccion?.completa,
-        p.aparato?.modelo,
-        p.aparato?.marca,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
+        p.aviso, p.orden, p.cliente?.nombre, p.cliente?.nif,
+        p.direccion?.completa, p.aparato?.modelo, p.aparato?.marca,
+      ].filter(Boolean).join(' ').toLowerCase()
       return blob.includes(low)
     })
   }
@@ -225,13 +261,8 @@ export async function cloudStats() {
 }
 
 export function labelCliente(payload) {
-  return (
-    val(payload?.cliente?.nombre) ||
-    `Aviso ${payload?.aviso || payload?.orden || ''}`
-  )
+  return val(payload?.cliente?.nombre) || `Aviso ${payload?.aviso || payload?.orden || ''}`
 }
-
-// ——— Preparaciones ———
 
 function preparacionToRow(prep) {
   let truncados = false
@@ -270,7 +301,7 @@ function preparacionToRow(prep) {
     completada: !!prep.completada,
     completada_en: prep.completadaEn || null,
     cerrada_por_aviso: !!prep.cerradaPorAviso,
-    updated_at: new Date().toISOString(),
+    updated_at: prep.actualizado || new Date().toISOString(),
   }
 }
 
@@ -298,17 +329,35 @@ function rowToPreparacion(row) {
   }
 }
 
-export async function cloudUpsertPreparacion(prep) {
+export async function cloudUpsertPreparacion(prep, opts = {}) {
   if (!supabase) throw new Error('Supabase no configurado')
   if (!prep?.id) throw new Error('Preparación sin id')
-  const row = preparacionToRow(prep)
+
+  let remote = null
+  try {
+    remote = await cloudGetPreparacion(prep.id)
+  } catch {
+    remote = null
+  }
+
+  const resolution = resolvePreparacionConflict(prep, remote)
+  const merged = resolution.result || prep
+
+  if (resolution.winner === 'remote' && !opts.forceLocal && remote) {
+    return { ...remote, _conflict: resolution }
+  }
+
+  const row = preparacionToRow({
+    ...merged,
+    actualizado: merged.actualizado || new Date().toISOString(),
+  })
   const { data, error } = await supabase
     .from('preparaciones')
     .upsert(row, { onConflict: 'local_id' })
     .select()
     .single()
   if (error) throw error
-  return rowToPreparacion(data)
+  return { ...rowToPreparacion(data), _conflict: resolution }
 }
 
 export async function cloudListPreparaciones(limit = 80) {
@@ -360,8 +409,6 @@ export async function cloudGetPreparacion(localId) {
   if (error) throw error
   return data ? rowToPreparacion(data) : null
 }
-
-// —— Auditoría en nube ——
 
 function auditRowToEntry(row) {
   if (!row) return null
