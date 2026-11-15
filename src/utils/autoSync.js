@@ -3,10 +3,11 @@
  * - Local = caché / modo offline
  * - Nube = fuente de verdad entre dispositivos
  * - Si no hay red, se encola y se sube al recuperar conexión
+ * - Conflictos: last-write-wins + fusión de piezas/checklist/adjuntos
  */
 
 import { isSupabaseConfigured, cloudUpsertPreparacion, cloudSyncMeta, cloudSaveBatch } from './db'
-import { listPreparaciones, getPreparacion } from './preparaciones'
+import { listPreparaciones, getPreparacion, updatePreparacion } from './preparaciones'
 import { isOnline } from './offlineCache'
 
 const QUEUE_KEY = 'boletines-sync-queue-v1'
@@ -30,9 +31,7 @@ function loadQueue() {
 function saveQueue(q) {
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(q))
-  } catch {
-    /* ignore */
-  }
+  } catch {}
 }
 
 function enqueuePrep(id) {
@@ -60,17 +59,12 @@ function enqueueBatch(nombre, avisos) {
   saveQueue(q)
 }
 
-const timers = {
-  prep: new Map(),
-  meta: null,
-}
+const timers = { prep: new Map(), meta: null }
 
 export function schedulePrepCloudSync(prepOrId) {
   const id = typeof prepOrId === 'string' ? prepOrId : prepOrId?.id
   if (!id || !isSupabaseConfigured) return
-
   enqueuePrep(id)
-
   const prev = timers.prep.get(id)
   if (prev) clearTimeout(prev)
   timers.prep.set(
@@ -94,11 +88,43 @@ async function flushPrep(id) {
     return { ok: true }
   }
   try {
-    await cloudUpsertPreparacion(prep)
+    const saved = await cloudUpsertPreparacion(prep)
+    if (saved && saved._conflict?.winner === 'remote') {
+      try {
+        updatePreparacion(id, {
+          titulo: saved.titulo,
+          marca: saved.marca,
+          modelo: saved.modelo,
+          tipo: saved.tipo,
+          avisoRef: saved.avisoRef,
+          citaFecha: saved.citaFecha || '',
+          citaHora: saved.citaHora || '',
+          notas: saved.notas,
+          piezas: saved.piezas || [],
+          checklist: saved.checklist || [],
+          adjuntos: saved.adjuntos || [],
+          completada: !!saved.completada,
+          completadaEn: saved.completadaEn || '',
+          actualizado: saved.actualizado,
+        })
+      } catch {}
+      if (typeof window !== 'undefined' && saved._conflict) {
+        window.dispatchEvent(
+          new CustomEvent('boletines-conflict-resolved', {
+            detail: {
+              tipo: 'preparacion',
+              id,
+              winner: saved._conflict.winner,
+              summary: saved._conflict.summary,
+            },
+          })
+        )
+      }
+    }
     const q = loadQueue()
     q.preps = q.preps.filter((x) => x !== id)
     saveQueue(q)
-    return { ok: true }
+    return { ok: true, conflict: saved?._conflict }
   } catch (err) {
     console.warn('[autoSync prep]', err?.message || err)
     return { ok: false, error: err }
@@ -113,9 +139,7 @@ export function scheduleMetaCloudSync(avisos) {
     timers.meta = null
     if (!isOnline()) return
     try {
-      if (avisos?.length) {
-        await cloudSyncMeta(avisos)
-      }
+      if (avisos?.length) await cloudSyncMeta(avisos)
       const q = loadQueue()
       q.meta = false
       saveQueue(q)
@@ -126,9 +150,7 @@ export function scheduleMetaCloudSync(avisos) {
 }
 
 export async function autoSaveBatch(nombre, avisos) {
-  if (!avisos?.length || !isSupabaseConfigured) {
-    return { ok: false, reason: 'skip' }
-  }
+  if (!avisos?.length || !isSupabaseConfigured) return { ok: false, reason: 'skip' }
   if (!isOnline()) {
     enqueueBatch(nombre, avisos)
     return { ok: false, reason: 'offline', queued: true }
