@@ -30,6 +30,7 @@ export function saveRecordatorioSettings(patch) {
   return next
 }
 
+/** Descartar el banner solo para hoy (vuelve mañana) */
 export function dismissRecordatoriosHoy() {
   const hoy = new Date()
   const ymd = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
@@ -55,6 +56,10 @@ function hoyYmd() {
   return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * Analiza avisos y devuelve recordatorios.
+ * Omite avisos en estado Terminado.
+ */
 export function calcularRecordatorios(avisos, settings = loadRecordatorioSettings()) {
   const citasHoy = []
   const limitesVencidos = []
@@ -69,7 +74,10 @@ export function calcularRecordatorios(avisos, settings = loadRecordatorioSetting
     seen.add(key)
 
     const meta = getMeta(a)
-    const nombre = val(a.cliente?.nombre) || `Aviso ${a.aviso || a.orden || ''}`
+    if (String(meta.estado || '').toLowerCase() === 'terminado') continue
+
+    const nombre =
+      val(a.cliente?.nombre) || `Aviso ${a.aviso || a.orden || ''}`
 
     if (settings.citasHoy && meta.citaFecha === hoy) {
       citasHoy.push({
