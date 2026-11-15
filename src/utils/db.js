@@ -4,88 +4,108 @@ import { val } from './parseAvisos'
 
 export { isSupabaseConfigured }
 
-/** Guarda un lote de avisos (un boletín) en la nube */
-export async function cloudSaveBatch({ nombre, avisos }) {
+/**
+ * Guarda un lote de avisos + meta en Supabase.
+ * Acepta cloudSaveBatch(nombre, avisos) o cloudSaveBatch({ nombre, avisos }).
+ */
+export async function cloudSaveBatch(nombreOrOpts, maybeAvisos) {
   if (!supabase) throw new Error('Supabase no configurado')
+
+  let nombre
+  let avisos
+  if (nombreOrOpts && typeof nombreOrOpts === 'object' && !Array.isArray(nombreOrOpts)) {
+    nombre = nombreOrOpts.nombre
+    avisos = nombreOrOpts.avisos
+  } else {
+    nombre = nombreOrOpts
+    avisos = maybeAvisos
+  }
+  if (!avisos?.length) throw new Error('Supabase no configurado o sin avisos')
+
   const { data: batch, error: e1 } = await supabase
     .from('batches')
-    .insert({ nombre: nombre || 'Boletín', count: (avisos || []).length })
+    .insert({
+      nombre: nombre || `Boletín ${new Date().toLocaleString('es-ES')}`,
+      avisos_count: avisos.length,
+    })
     .select()
     .single()
   if (e1) throw e1
 
-  const rows = (avisos || []).map((a, i) => ({
+  const rows = avisos.map((a, i) => ({
     batch_id: batch.id,
     aviso_key: avisoKey(a) || `idx-${i}`,
+    orden: a.orden != null ? String(a.orden) : null,
     payload: a,
   }))
-  if (rows.length) {
-    const { error: e2 } = await supabase.from('avisos').insert(rows)
-    if (e2) throw e2
-  }
+  const { error: e2 } = await supabase.from('avisos').insert(rows)
+  if (e2) throw e2
 
-  const metas = (avisos || []).map((a) => {
-    const m = getMeta(a)
-    return {
-      aviso_key: avisoKey(a),
-      estado: m.estado || 'Pendiente',
-      nota: m.nota || '',
-      checklist: m.checklist || {},
-      inicio_visita: m.inicioVisita || null,
-      fin_visita: m.finVisita || null,
-      piezas: m.piezas || [],
-      cita_fecha: m.citaFecha || '',
-      cita_hora: m.citaHora || '',
-      franja: m.franja || '',
-      cita_origen: m.citaOrigen || '',
-    }
-  }).filter((r) => r.aviso_key)
-
+  const metas = avisos
+    .map((a) => {
+      const m = getMeta(a)
+      return {
+        aviso_key: avisoKey(a),
+        estado: m.estado || 'Pendiente',
+        nota: m.nota || '',
+        checklist: m.checklist || {},
+        inicio_visita: m.inicioVisita || '',
+        fin_visita: m.finVisita || '',
+        piezas: m.piezas || [],
+        cita_fecha: m.citaFecha || '',
+        cita_hora: m.citaHora || '',
+        franja: m.franja || '',
+        updated_at: new Date().toISOString(),
+      }
+    })
+    .filter((r) => r.aviso_key)
   if (metas.length) {
     const { error: e3 } = await supabase
       .from('aviso_meta')
       .upsert(metas, { onConflict: 'aviso_key' })
     if (e3) throw e3
   }
-
   return batch
 }
 
 export async function cloudListBatches() {
-  if (!supabase) throw new Error('Supabase no configurado')
+  if (!supabase) return []
   const { data, error } = await supabase
     .from('batches')
-    .select('*')
+    .select('id, nombre, created_at, avisos_count')
     .order('created_at', { ascending: false })
     .limit(40)
   if (error) throw error
   return data || []
 }
 
+export async function cloudDeleteBatch(batchId) {
+  if (!supabase) throw new Error('Supabase no configurado')
+  if (!batchId) throw new Error('Falta el id del lote')
+  const { error: e1 } = await supabase.from('avisos').delete().eq('batch_id', batchId)
+  if (e1) throw e1
+  const { error: e2 } = await supabase.from('batches').delete().eq('id', batchId)
+  if (e2) throw e2
+}
+
 export async function cloudLoadBatch(batchId) {
   if (!supabase) throw new Error('Supabase no configurado')
-  const { data: avisos, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('avisos')
     .select('aviso_key, payload')
     .eq('batch_id', batchId)
   if (error) throw error
 
-  const keys = (avisos || []).map((r) => r.aviso_key).filter(Boolean)
-  let metaMap = {}
+  const avisos = (rows || []).map((r) => r.payload || {})
+  const keys = (rows || []).map((r) => r.aviso_key).filter(Boolean)
   if (keys.length) {
     const { data: metas } = await supabase
       .from('aviso_meta')
       .select('*')
       .in('aviso_key', keys)
     ;(metas || []).forEach((m) => {
-      metaMap[m.aviso_key] = m
-    })
-  }
-
-  return (avisos || []).map((row) => {
-    const a = row.payload || {}
-    const m = metaMap[row.aviso_key]
-    if (m) {
+      const a = avisos.find((x) => avisoKey(x) === m.aviso_key)
+      if (!a) return
       setMeta(a, {
         estado: m.estado || 'Pendiente',
         nota: m.nota || '',
@@ -98,37 +118,32 @@ export async function cloudLoadBatch(batchId) {
         franja: m.franja || '',
         citaOrigen: m.cita_origen || '',
       })
-    }
-    return a
-  })
+    })
+  }
+  return avisos
 }
 
-export async function cloudDeleteBatch(batchId) {
-  if (!supabase) throw new Error('Supabase no configurado')
-  const { error: e1 } = await supabase.from('avisos').delete().eq('batch_id', batchId)
-  if (e1) throw e1
-  const { error: e2 } = await supabase.from('batches').delete().eq('id', batchId)
-  if (e2) throw e2
-}
-
-export async function cloudSyncMetas(avisos) {
-  if (!supabase) throw new Error('Supabase no configurado')
-  const metas = (avisos || []).map((a) => {
-    const m = getMeta(a)
-    return {
-      aviso_key: avisoKey(a),
-      estado: m.estado || 'Pendiente',
-      nota: m.nota || '',
-      checklist: m.checklist || {},
-      inicio_visita: m.inicioVisita || null,
-      fin_visita: m.finVisita || null,
-      piezas: m.piezas || [],
-      cita_fecha: m.citaFecha || '',
-      cita_hora: m.citaHora || '',
-      franja: m.franja || '',
-      cita_origen: m.citaOrigen || '',
-    }
-  }).filter((r) => r.aviso_key)
+/** Sincroniza meta de los avisos actuales */
+export async function cloudSyncMeta(avisos) {
+  if (!supabase || !avisos?.length) return
+  const metas = avisos
+    .map((a) => {
+      const m = getMeta(a)
+      return {
+        aviso_key: avisoKey(a),
+        estado: m.estado || 'Pendiente',
+        nota: m.nota || '',
+        checklist: m.checklist || {},
+        inicio_visita: m.inicioVisita || '',
+        fin_visita: m.finVisita || '',
+        piezas: m.piezas || [],
+        cita_fecha: m.citaFecha || '',
+        cita_hora: m.citaHora || '',
+        franja: m.franja || '',
+        updated_at: new Date().toISOString(),
+      }
+    })
+    .filter((r) => r.aviso_key)
   if (!metas.length) return
   const { error } = await supabase
     .from('aviso_meta')
@@ -136,34 +151,54 @@ export async function cloudSyncMetas(avisos) {
   if (error) throw error
 }
 
-export async function cloudSearchAvisos(query) {
-  if (!supabase) throw new Error('Supabase no configurado')
-  const q = String(query || '').trim()
-  if (!q) return []
+/** Alias de compatibilidad */
+export async function cloudSyncMetas(avisos) {
+  return cloudSyncMeta(avisos)
+}
+
+/** Historial de clientes / búsqueda */
+export async function cloudSearchClientes(query) {
+  if (!supabase || !query?.trim()) return []
+  const q = query.trim()
   const { data, error } = await supabase
     .from('avisos')
-    .select('aviso_key, payload, batch_id, created_at')
+    .select('aviso_key, payload, created_at, batch_id')
     .or(
-      `payload->>cliente.cs.{"nombre":"${q}"},payload->cliente->>nombre.ilike.%${q}%,payload->cliente->>nif.ilike.%${q}%,payload->direccion->>completa.ilike.%${q}%,payload->aparato->>modelo.ilike.%${q}%`
+      `payload->cliente->>nombre.ilike.%${q}%,payload->cliente->>nif.ilike.%${q}%,payload->direccion->>completa.ilike.%${q}%,payload->aparato->>modelo.ilike.%${q}%`
     )
-    .limit(30)
+    .order('created_at', { ascending: false })
+    .limit(40)
+
   if (error) {
-    const { data: all } = await supabase
+    const { data: all, error: e2 } = await supabase
       .from('avisos')
-      .select('aviso_key, payload, batch_id, created_at')
+      .select('aviso_key, payload, created_at, batch_id')
       .order('created_at', { ascending: false })
       .limit(80)
+    if (e2) throw e2
     const low = q.toLowerCase()
     return (all || []).filter((row) => {
       const p = row.payload || {}
       const blob = [
-        p.aviso, p.orden, p.cliente?.nombre, p.cliente?.nif,
-        p.direccion?.completa, p.aparato?.modelo, p.aparato?.marca,
-      ].filter(Boolean).join(' ').toLowerCase()
+        p.aviso,
+        p.orden,
+        p.cliente?.nombre,
+        p.cliente?.nif,
+        p.direccion?.completa,
+        p.aparato?.modelo,
+        p.aparato?.marca,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
       return blob.includes(low)
     })
   }
   return data || []
+}
+
+export async function cloudSearchAvisos(query) {
+  return cloudSearchClientes(query)
 }
 
 export async function cloudStats() {
@@ -171,14 +206,32 @@ export async function cloudStats() {
   const { count: nAvisos } = await supabase
     .from('avisos')
     .select('*', { count: 'exact', head: true })
+  const { count: nBatches } = await supabase
+    .from('batches')
+    .select('*', { count: 'exact', head: true })
   const { data: metas } = await supabase.from('aviso_meta').select('estado')
-  const byEstado = {}
+  const porEstado = {}
   ;(metas || []).forEach((m) => {
     const e = m.estado || 'Pendiente'
-    byEstado[e] = (byEstado[e] || 0) + 1
+    porEstado[e] = (porEstado[e] || 0) + 1
   })
-  return { nAvisos: nAvisos || 0, byEstado }
+  return {
+    avisos: nAvisos || 0,
+    batches: nBatches || 0,
+    porEstado,
+    nAvisos: nAvisos || 0,
+    byEstado: porEstado,
+  }
 }
+
+export function labelCliente(payload) {
+  return (
+    val(payload?.cliente?.nombre) ||
+    `Aviso ${payload?.aviso || payload?.orden || ''}`
+  )
+}
+
+// ——— Preparaciones ———
 
 function preparacionToRow(prep) {
   let truncados = false
@@ -247,6 +300,7 @@ function rowToPreparacion(row) {
 
 export async function cloudUpsertPreparacion(prep) {
   if (!supabase) throw new Error('Supabase no configurado')
+  if (!prep?.id) throw new Error('Preparación sin id')
   const row = preparacionToRow(prep)
   const { data, error } = await supabase
     .from('preparaciones')
@@ -257,37 +311,138 @@ export async function cloudUpsertPreparacion(prep) {
   return rowToPreparacion(data)
 }
 
-export async function cloudListPreparaciones() {
-  if (!supabase) throw new Error('Supabase no configurado')
+export async function cloudListPreparaciones(limit = 80) {
+  if (!supabase) return []
   const { data, error } = await supabase
     .from('preparaciones')
     .select('*')
     .order('updated_at', { ascending: false })
-    .limit(80)
+    .limit(limit)
   if (error) throw error
   return (data || []).map(rowToPreparacion)
 }
 
 export async function cloudSearchPreparaciones(filters = {}) {
-  if (!supabase) throw new Error('Supabase no configurado')
-  let q = supabase.from('preparaciones').select('*').order('updated_at', { ascending: false }).limit(40)
-  if (filters.marca) q = q.eq('marca', filters.marca)
-  if (filters.tipo) q = q.eq('tipo', filters.tipo)
-  if (filters.modelo) q = q.ilike('modelo', `%${filters.modelo}%`)
-  if (filters.aviso) q = q.ilike('aviso_ref', `%${filters.aviso}%`)
-  if (filters.q) {
-    const qq = filters.q
-    q = q.or(
-      `titulo.ilike.%${qq}%,marca.ilike.%${qq}%,modelo.ilike.%${qq}%,tipo.ilike.%${qq}%,aviso_ref.ilike.%${qq}%,notas.ilike.%${qq}%`
+  if (!supabase) return []
+  let query = supabase
+    .from('preparaciones')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(60)
+  if (filters.marca?.trim()) query = query.ilike('marca', `%${filters.marca.trim()}%`)
+  if (filters.tipo?.trim()) query = query.ilike('tipo', `%${filters.tipo.trim()}%`)
+  if (filters.modelo?.trim()) query = query.ilike('modelo', `%${filters.modelo.trim()}%`)
+  if (filters.aviso) query = query.ilike('aviso_ref', `%${filters.aviso}%`)
+  const q = filters.q?.trim()
+  if (q) {
+    query = query.or(
+      `titulo.ilike.%${q}%,marca.ilike.%${q}%,modelo.ilike.%${q}%,tipo.ilike.%${q}%,aviso_ref.ilike.%${q}%,notas.ilike.%${q}%`
     )
   }
-  const { data, error } = await q
+  const { data, error } = await query
   if (error) throw error
   return (data || []).map(rowToPreparacion)
 }
 
 export async function cloudDeletePreparacion(localId) {
-  if (!supabase) throw new Error('Supabase no configurado')
+  if (!supabase || !localId) return
   const { error } = await supabase.from('preparaciones').delete().eq('local_id', localId)
   if (error) throw error
+}
+
+export async function cloudGetPreparacion(localId) {
+  if (!supabase || !localId) return null
+  const { data, error } = await supabase
+    .from('preparaciones')
+    .select('*')
+    .eq('local_id', localId)
+    .maybeSingle()
+  if (error) throw error
+  return data ? rowToPreparacion(data) : null
+}
+
+// —— Auditoría en nube ——
+
+function auditRowToEntry(row) {
+  if (!row) return null
+  return {
+    id: row.local_id || row.id,
+    cloudId: row.id,
+    ts: row.created_at,
+    tipo: row.tipo || 'sistema',
+    accion: row.accion || '',
+    ref: row.ref || '',
+    resumen: row.resumen || '',
+    detalle: row.detalle || '',
+    antes: row.antes ?? null,
+    despues: row.despues ?? null,
+    fuente: 'nube',
+    userId: row.user_id || null,
+  }
+}
+
+export async function cloudLogAuditoria(item) {
+  if (!supabase || !item) return null
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const row = {
+      local_id: item.id || null,
+      created_at: item.ts || new Date().toISOString(),
+      tipo: item.tipo || 'sistema',
+      accion: item.accion || '',
+      ref: item.ref != null ? String(item.ref) : '',
+      resumen: item.resumen || '',
+      detalle: item.detalle || '',
+      antes: item.antes ?? null,
+      despues: item.despues ?? null,
+      user_id: user?.id || null,
+      origen:
+        typeof navigator !== 'undefined'
+          ? navigator.userAgent?.slice(0, 120) || ''
+          : '',
+    }
+    const { data, error } = await supabase.from('auditoria').insert(row).select().single()
+    if (error) {
+      console.warn('[auditoria nube]', error.message)
+      return null
+    }
+    return auditRowToEntry(data)
+  } catch (err) {
+    console.warn('[auditoria nube]', err?.message || err)
+    return null
+  }
+}
+
+export async function cloudListAuditoria({ limit = 100, tipo = '', q = '' } = {}) {
+  if (!supabase) return []
+  let query = supabase
+    .from('auditoria')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (tipo) query = query.eq('tipo', tipo)
+  if (q?.trim()) {
+    const needle = q.trim()
+    query = query.or(
+      `ref.ilike.%${needle}%,resumen.ilike.%${needle}%,detalle.ilike.%${needle}%,accion.ilike.%${needle}%`
+    )
+  }
+  const { data, error } = await query
+  if (error) {
+    console.warn('[auditoria nube list]', error.message)
+    throw error
+  }
+  return (data || []).map(auditRowToEntry).filter(Boolean)
+}
+
+export async function cloudClearAuditoria() {
+  if (!supabase) throw new Error('Supabase no configurado')
+  const { error } = await supabase
+    .from('auditoria')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000')
+  if (error) throw error
+  return true
 }
