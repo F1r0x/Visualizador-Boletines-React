@@ -1,3 +1,4 @@
+import { setMeta } from './localMeta'
 const KEY = 'boletines-preparaciones-v1'
 const MAX_ENTRIES = 40
 const MAX_IMG_BYTES = 450_000
@@ -101,6 +102,9 @@ export function createPreparacion(partial = {}) {
   }
   const list = [item, ...listPreparaciones()]
   saveAll(list)
+  try {
+    if (item.avisoRef) syncPreparacionPiezasToAviso(item)
+  } catch {}
   try {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
@@ -206,6 +210,46 @@ export function createPreparacionFromAviso(aviso, meta = {}) {
   })
 }
 
+/** Convierte piezas de ficha → formato meta del aviso (AvisoCard) */
+export function prepPiezasToAvisoMeta(piezas) {
+  return (Array.isArray(piezas) ? piezas : [])
+    .map((p) => {
+      if (typeof p === 'string') {
+        return { nombre: p.trim(), cantidad: 1 }
+      }
+      const ref = String(p.ref || p.referencia || '').trim()
+      const desc = String(p.descripcion || p.nombre || '').trim()
+      const nombre =
+        [ref, desc].filter(Boolean).join(' · ') ||
+        String(p.nombre || '').trim() ||
+        'Pieza'
+      return {
+        nombre,
+        cantidad: Number(p.cantidad) > 0 ? Number(p.cantidad) : 1,
+        ref,
+        descripcion: desc,
+      }
+    })
+    .filter((p) => p.nombre)
+}
+
+/**
+ * Si la ficha tiene nº de aviso, copia sus piezas al meta del boletín.
+ * Así al guardar la ficha, AvisoCard muestra las mismas piezas.
+ */
+export function syncPreparacionPiezasToAviso(prep) {
+  const ref = normalizeAvisoNum(prep?.avisoRef)
+  if (!ref) return null
+  const piezas = prepPiezasToAvisoMeta(prep.piezas)
+  try {
+    setMeta({ aviso: ref }, { piezas })
+  } catch (e) {
+    console.warn('[sync piezas→aviso]', e)
+    return null
+  }
+  return piezas
+}
+
 export function updatePreparacion(id, patch) {
   const list = listPreparaciones()
   const i = list.findIndex((p) => p.id === id)
@@ -219,6 +263,13 @@ export function updatePreparacion(id, patch) {
     actualizado: new Date().toISOString(),
   }
   saveAll(list)
+  try {
+    if (list[i].avisoRef) {
+      syncPreparacionPiezasToAviso(list[i])
+    }
+  } catch (e) {
+    console.warn('[sync piezas]', e)
+  }
   try {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
