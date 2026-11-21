@@ -6,6 +6,7 @@ import './cloud.css'
 import './styles-long-fields.css'
 import './styles-calendario.css'
 import './styles-preparaciones.css'
+import './styles-recambios.css'
 
 // Tema inicial antes del primer paint (evita parpadeo)
 ;(function initTheme() {
