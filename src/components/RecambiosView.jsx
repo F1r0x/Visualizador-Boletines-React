@@ -8,6 +8,7 @@ import {
   deleteByFactura,
   statsRecambios,
   listadoADevolver,
+  listadoConsulta,
   accionesDisponibles,
   ESTADOS_RECAMBIO,
   ESTADO_LABEL,
@@ -27,27 +28,24 @@ function formatFecha(s) {
   if (!s) return ''
   if (/^\d{2}\.\d{2}\.\d{4}/.test(s)) return s
   try {
-    return new Date(s).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    })
+    return new Date(s).toLocaleString('es-ES')
   } catch {
-    return s
+    return String(s)
   }
 }
 
 export default function RecambiosView({ onChange }) {
   const [tick, setTick] = useState(0)
+  const [importText, setImportText] = useState('')
+  const [showImport, setShowImport] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const [error, setError] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [filtroAviso, setFiltroAviso] = useState('')
   const [busqueda, setBusqueda] = useState('')
-  const [vistaStock, setVistaStock] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
-  const [importText, setImportText] = useState('')
-  const [importMsg, setImportMsg] = useState('')
   const [selectedId, setSelectedId] = useState(null)
-  const [error, setError] = useState('')
+  const [vistaStock, setVistaStock] = useState(false)
+  const [notasDraft, setNotasDraft] = useState('')
 
   const refresh = useCallback(() => {
     setTick((t) => t + 1)
@@ -63,6 +61,7 @@ export default function RecambiosView({ onChange }) {
   const all = useMemo(() => listRecambios(), [tick])
   const stats = useMemo(() => statsRecambios(), [tick])
   const aDevolver = useMemo(() => listadoADevolver(), [tick])
+  const enConsulta = useMemo(() => listadoConsulta(), [tick])
 
   const avisosDisponibles = useMemo(() => {
     const set = new Set()
@@ -91,10 +90,13 @@ export default function RecambiosView({ onChange }) {
           r.material,
           r.descripcion,
           r.aviso,
+          r.utilizado_en_aviso,
           r.factura,
           r.pedido_bsh,
           r.notas,
+          ESTADO_LABEL[r.estado],
         ]
+          .filter(Boolean)
           .join(' ')
           .toLowerCase()
         if (!blob.includes(q)) return false
@@ -103,95 +105,59 @@ export default function RecambiosView({ onChange }) {
     })
   }, [all, filtroEstado, filtroAviso, busqueda])
 
-  const stockGrouped = useMemo(() => {
-    if (!vistaStock) return []
-    const vivos = all.filter(
-      (r) => r.estado === 'en_furgoneta' || r.estado === 'recibido'
-    )
-    const map = new Map()
-    for (const r of vivos) {
-      const k = r.material || 'sin_ref'
-      if (!map.has(k)) {
-        map.set(k, {
-          material: r.material,
-          descripcion: r.descripcion,
-          cantidad: 0,
-          valor_neto: 0,
-          items: [],
-        })
-      }
-      const g = map.get(k)
-      g.cantidad += r.cantidad || 1
-      g.valor_neto = Math.round((g.valor_neto + (r.valor_neto || 0)) * 100) / 100
-      g.items.push(r)
-    }
-    return [...map.values()].sort((a, b) =>
-      String(a.material).localeCompare(String(b.material))
-    )
-  }, [all, vistaStock])
+  const selected = useMemo(
+    () => all.find((r) => r.id === selectedId) || null,
+    [all, selectedId]
+  )
 
-  const selected = selectedId
-    ? all.find((r) => r.id === selectedId) || null
-    : null
+  useEffect(() => {
+    setNotasDraft(selected?.notas || '')
+  }, [selected?.id, selected?.notas])
+
+  const onImport = () => {
+    setError('')
+    setImportMsg('')
+    try {
+      const data = JSON.parse(importText)
+      const payload = Array.isArray(data) ? data[0] : data
+      const res = importFromFacturaPayload(payload)
+      setImportMsg(
+        `Importados ${res.added} · omitidos ${res.skipped} (duplicados) · total ${res.total}` +
+          (res.factura ? ` · factura ${res.factura}` : '')
+      )
+      setImportText('')
+      setShowImport(false)
+      refresh()
+    } catch (e) {
+      setError(e.message || String(e))
+    }
+  }
 
   const cambiarEstado = (id, estado) => {
     setError('')
     try {
-      setEstadoRecambio(id, estado, { origen: 'ui' })
+      setEstadoRecambio(id, estado)
       refresh()
     } catch (e) {
-      setError(e.message || 'No se pudo cambiar el estado')
+      setError(e.message || String(e))
     }
   }
 
-  const guardarNotas = (id, notas) => {
-    updateRecambio(id, { notas })
+  const guardarNotas = () => {
+    if (!selected) return
+    updateRecambio(selected.id, { notas: notasDraft })
     refresh()
   }
 
-  const eliminar = (id) => {
-    if (!window.confirm('¿Eliminar este recambio del inventario local?')) return
+  const onDelete = (id) => {
+    if (!window.confirm('¿Eliminar este recambio del listado local?')) return
     deleteRecambio(id)
     if (selectedId === id) setSelectedId(null)
     refresh()
   }
 
-  const importar = () => {
-    setImportMsg('')
-    setError('')
-    try {
-      const raw = importText.trim()
-      if (!raw) {
-        setImportMsg('Pega el JSON de n8n')
-        return
-      }
-      let data = JSON.parse(raw)
-      if (Array.isArray(data)) data = data[0] || {}
-      if (data.json) data = data.json
-      const result = importFromFacturaPayload(data)
-      setImportMsg(
-        `Factura ${result.factura || '—'}: +${result.added} líneas` +
-          (result.skipped ? `, ${result.skipped} ya existían` : '') +
-          ` · Total inventario: ${result.total}`
-      )
-      setImportText('')
-      if (result.added > 0) {
-        setImportOpen(false)
-        setFiltroEstado('recibido')
-      }
-      refresh()
-    } catch (e) {
-      setImportMsg('JSON no válido: ' + (e.message || e))
-    }
-  }
-
-  const borrarFactura = (fac) => {
-    if (
-      !window.confirm(
-        `¿Eliminar todas las líneas de la factura ${fac} del inventario local?`
-      )
-    )
-      return
+  const onDeleteFactura = (fac) => {
+    if (!window.confirm(`¿Eliminar todos los recambios de la factura ${fac}?`)) return
     deleteByFactura(fac)
     setSelectedId(null)
     refresh()
@@ -201,25 +167,26 @@ export default function RecambiosView({ onChange }) {
     <div className="rec-wrap">
       <div className="rec-toolbar">
         <div>
-          <h2 className="rec-title">Recambios</h2>
+          <h2 className="rec-title">Recambios / almacén</h2>
           <p className="rec-sub">
-            Material de facturas BSH · usado, stock y devoluciones
+            Facturas BSH · estados: Pedido → Recibido → Furgoneta / Utilizado / Devolver · Consulta
+            (incidencia)
           </p>
         </div>
         <div className="rec-toolbar-actions">
           <button
             type="button"
             className="btn-sm"
-            onClick={() => setImportOpen((v) => !v)}
+            onClick={() => setShowImport((v) => !v)}
           >
-            {importOpen ? 'Cerrar importación' : 'Importar factura (JSON)'}
+            {showImport ? 'Cerrar import' : 'Importar JSON factura'}
           </button>
           <button
             type="button"
-            className={`btn-sm${vistaStock ? ' active' : ''}`}
+            className={`btn-sm${vistaStock ? ' primary' : ''}`}
             onClick={() => setVistaStock((v) => !v)}
           >
-            {vistaStock ? 'Ver lista' : 'Stock por material'}
+            {vistaStock ? 'Ver listado' : 'Vista stock'}
           </button>
         </div>
       </div>
@@ -248,10 +215,6 @@ export default function RecambiosView({ onChange }) {
           </button>
         ))}
         <div className="rec-stat rec-stat-money">
-          <span className="num">{formatMoney(stats.valor_stock)}</span>
-          <span className="label">Valor stock</span>
-        </div>
-        <div className="rec-stat rec-stat-money">
           <span className="num" style={{ color: ESTADO_COLOR.a_devolver }}>
             {formatMoney(stats.valor_a_devolver)}
           </span>
@@ -261,21 +224,20 @@ export default function RecambiosView({ onChange }) {
 
       {error && <div className="rec-error">{error}</div>}
 
-      {importOpen && (
+      {showImport && (
         <div className="rec-import">
           <p className="rec-import-hint">
-            Pega aquí el JSON completo que devuelve el Code node de n8n (con{' '}
-            <code>factura</code>, <code>lineas</code>, etc.). Las líneas ya
-            importadas no se duplican.
+            Pega el JSON de respuesta del webhook de facturas (objeto con factura +
+            lineas).
           </p>
           <textarea
-            rows={8}
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
+            rows={8}
             placeholder='{ "factura": {...}, "lineas": [...] }'
           />
           <div className="rec-import-actions">
-            <button type="button" className="btn-sm primary" onClick={importar}>
+            <button type="button" className="btn-sm primary" onClick={onImport}>
               Importar
             </button>
             {importMsg && <span className="rec-import-msg">{importMsg}</span>}
@@ -292,9 +254,9 @@ export default function RecambiosView({ onChange }) {
           onChange={(e) => setBusqueda(e.target.value)}
         />
         <select
+          className="filter-select"
           value={filtroEstado}
           onChange={(e) => setFiltroEstado(e.target.value)}
-          className="filter-select"
         >
           <option value="">Todos los estados</option>
           {ESTADOS_RECAMBIO.map((e) => (
@@ -304,9 +266,9 @@ export default function RecambiosView({ onChange }) {
           ))}
         </select>
         <select
+          className="filter-select"
           value={filtroAviso}
           onChange={(e) => setFiltroAviso(e.target.value)}
-          className="filter-select"
         >
           <option value="">Todos los avisos</option>
           {avisosDisponibles.map((a) => (
@@ -347,25 +309,64 @@ export default function RecambiosView({ onChange }) {
         </div>
       )}
 
+      {enConsulta.length > 0 && filtroEstado !== 'consulta' && (
+        <div className="rec-banner-consulta">
+          <strong>{enConsulta.length}</strong> pieza(s) en consulta / incidencia
+          · {formatMoney(stats.valor_consulta || 0)}
+          <button
+            type="button"
+            className="btn-sm"
+            onClick={() => {
+              setFiltroEstado('consulta')
+              setVistaStock(false)
+            }}
+          >
+            Ver incidencias
+          </button>
+        </div>
+      )}
+
       {vistaStock ? (
         <div className="rec-stock">
-          <h3>Stock por material (recibido + furgoneta)</h3>
-          {stockGrouped.length === 0 ? (
-            <p className="rec-empty">No hay material en stock.</p>
+          <p className="rec-sub">Agrupado por referencia de material</p>
+          {filtrados.length === 0 ? (
+            <div className="rec-empty">No hay piezas con los filtros actuales.</div>
           ) : (
             <ul className="rec-stock-list">
-              {stockGrouped.map((g) => (
-                <li key={g.material}>
-                  <div className="rec-stock-main">
-                    <strong className="rec-mat">{g.material}</strong>
-                    <span className="rec-desc">{g.descripcion}</span>
-                  </div>
-                  <div className="rec-stock-meta">
-                    <span className="rec-qty">{g.cantidad} ud.</span>
-                    <span>{formatMoney(g.valor_neto)}</span>
-                  </div>
-                </li>
-              ))}
+              {(() => {
+                const map = new Map()
+                for (const r of filtrados) {
+                  const k = r.material || 'sin_ref'
+                  if (!map.has(k)) {
+                    map.set(k, {
+                      material: r.material,
+                      descripcion: r.descripcion,
+                      cantidad: 0,
+                      valor: 0,
+                      estados: {},
+                    })
+                  }
+                  const g = map.get(k)
+                  g.cantidad += r.cantidad || 1
+                  g.valor += r.valor_neto || 0
+                  g.estados[r.estado] = (g.estados[r.estado] || 0) + (r.cantidad || 1)
+                }
+                return [...map.values()].map((g) => (
+                  <li key={g.material}>
+                    <div className="rec-stock-main">
+                      <strong>{g.material}</strong>
+                      <span className="rec-qty">×{g.cantidad}</span>
+                    </div>
+                    <div className="rec-stock-meta">
+                      {g.descripcion} · {formatMoney(g.valor)}
+                      <br />
+                      {Object.entries(g.estados)
+                        .map(([e, c]) => `${labelEstado(e)}: ${c}`)
+                        .join(' · ')}
+                    </div>
+                  </li>
+                ))
+              })()}
             </ul>
           )}
         </div>
@@ -373,39 +374,38 @@ export default function RecambiosView({ onChange }) {
         <div className="rec-layout">
           <div className="rec-list-panel">
             {filtrados.length === 0 ? (
-              <p className="rec-empty">
+              <div className="rec-empty">
                 {all.length === 0
                   ? 'Aún no hay recambios. Importa el JSON de una factura BSH.'
                   : 'Ningún recambio coincide con los filtros.'}
-              </p>
+              </div>
             ) : (
               <ul className="rec-list">
                 {filtrados.map((r) => (
-                  <li
-                    key={r.id}
-                    className={`rec-list-item${selectedId === r.id ? ' active' : ''}`}
-                    onClick={() => setSelectedId(r.id)}
-                  >
-                    <div className="rec-list-top">
-                      <span
-                        className="rec-badge"
-                        style={{ background: ESTADO_COLOR[r.estado] }}
-                      >
-                        {labelEstado(r.estado)}
-                      </span>
-                      <span className="rec-mat">{r.material}</span>
-                      {r.aviso && (
-                        <span className="rec-aviso">Av. {r.aviso}</span>
-                      )}
-                    </div>
-                    <div className="rec-list-name">{r.descripcion || '—'}</div>
-                    <div className="rec-list-meta">
-                      <span>{formatMoney(r.valor_neto)}</span>
-                      {r.factura && <span>Fac. {r.factura}</span>}
-                      {r.fecha_factura && (
-                        <span>{formatFecha(r.fecha_factura)}</span>
-                      )}
-                    </div>
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      className={`rec-list-item${selectedId === r.id ? ' active' : ''}`}
+                      onClick={() => setSelectedId(r.id)}
+                    >
+                      <div className="rec-list-top">
+                        <span
+                          className="rec-badge"
+                          style={{ background: ESTADO_COLOR[r.estado] || '#666' }}
+                        >
+                          {labelEstado(r.estado)}
+                        </span>
+                        <span className="rec-mat">{r.material || '—'}</span>
+                        {r.aviso && (
+                          <span className="rec-aviso">Aviso {r.aviso}</span>
+                        )}
+                      </div>
+                      <p className="rec-desc">{r.descripcion || 'Sin descripción'}</p>
+                      <p className="rec-list-meta">
+                        {formatMoney(r.valor_neto)} · Fact. {r.factura || '—'}
+                        {r.pedido_bsh ? ` · Ped. ${r.pedido_bsh}` : ''}
+                      </p>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -414,63 +414,48 @@ export default function RecambiosView({ onChange }) {
 
           <div className="rec-detail">
             {!selected ? (
-              <p className="rec-empty">Selecciona un recambio para gestionar su estado.</p>
+              <div className="rec-empty">Selecciona una pieza para ver el detalle y cambiar el estado.</div>
             ) : (
               <>
                 <div className="rec-detail-header">
                   <div>
-                    <span
-                      className="rec-badge"
-                      style={{ background: ESTADO_COLOR[selected.estado] }}
-                    >
-                      {labelEstado(selected.estado)}
-                    </span>
                     <h3 className="rec-detail-title">
                       {selected.material}{' '}
-                      <span className="rec-desc">{selected.descripcion}</span>
+                      <span
+                        className="rec-badge"
+                        style={{ background: ESTADO_COLOR[selected.estado] || '#666' }}
+                      >
+                        {labelEstado(selected.estado)}
+                      </span>
                     </h3>
+                    <p className="rec-desc">{selected.descripcion}</p>
                   </div>
                   <button
                     type="button"
                     className="btn-sm btn-danger"
-                    onClick={() => eliminar(selected.id)}
+                    onClick={() => onDelete(selected.id)}
                   >
                     Eliminar
                   </button>
                 </div>
 
                 <dl className="rec-dl">
-                  <dt>Aviso pedido</dt>
-                  <dd>{selected.aviso || '—'}</dd>
-                  <dt>Utilizado en</dt>
-                  <dd>{selected.utilizado_en_aviso || '—'}</dd>
-                  <dt>Pedido BSH</dt>
-                  <dd>{selected.pedido_bsh || '—'}</dd>
-                  <dt>Pedido cliente</dt>
-                  <dd>{selected.pedido_cliente || '—'}</dd>
-                  <dt>Factura</dt>
-                  <dd>
-                    {selected.factura || '—'}
-                    {selected.fecha_factura
-                      ? ` · ${formatFecha(selected.fecha_factura)}`
-                      : ''}
-                  </dd>
-                  <dt>Albarán</dt>
-                  <dd>{selected.albaran || '—'}</dd>
                   <dt>Cantidad</dt>
                   <dd>{selected.cantidad}</dd>
-                  <dt>Precio / neto</dt>
-                  <dd>
-                    {formatMoney(selected.precio_unidad)} →{' '}
-                    {formatMoney(selected.valor_neto)}
-                    {selected.descuento_pct != null
-                      ? ` (${selected.descuento_pct}%)`
-                      : ''}
-                  </dd>
+                  <dt>Valor neto</dt>
+                  <dd>{formatMoney(selected.valor_neto)}</dd>
+                  <dt>Factura</dt>
+                  <dd>{selected.factura || '—'}</dd>
+                  <dt>Pedido BSH</dt>
+                  <dd>{selected.pedido_bsh || '—'}</dd>
+                  <dt>Aviso</dt>
+                  <dd>{selected.aviso || selected.utilizado_en_aviso || '—'}</dd>
+                  <dt>Fecha factura</dt>
+                  <dd>{selected.fecha_factura || '—'}</dd>
                 </dl>
 
                 <div className="rec-actions">
-                  <span className="rec-actions-label">Cambiar estado</span>
+                  <div className="rec-actions-label">Cambiar estado</div>
                   <div className="rec-actions-btns">
                     {accionesDisponibles(selected).map((a) => (
                       <button
@@ -489,47 +474,39 @@ export default function RecambiosView({ onChange }) {
                   </div>
                 </div>
 
-                <label className="rec-field">
-                  <span>Notas</span>
+                <div className="rec-field">
+                  <label htmlFor="rec-notas">Notas</label>
                   <textarea
-                    rows={3}
-                    defaultValue={selected.notas || ''}
-                    key={selected.id + '-notas'}
-                    onBlur={(e) => {
-                      if (e.target.value !== (selected.notas || '')) {
-                        guardarNotas(selected.id, e.target.value)
-                      }
-                    }}
-                    placeholder="Observaciones, ubicación en furgoneta…"
+                    id="rec-notas"
+                    value={notasDraft}
+                    onChange={(e) => setNotasDraft(e.target.value)}
+                    onBlur={guardarNotas}
+                    placeholder="Incidencia, seguimiento con BSH, ubicación…"
                   />
-                </label>
+                </div>
 
-                {selected.historial_estados?.length > 0 && (
-                  <div className="rec-hist">
-                    <span className="rec-actions-label">Historial</span>
-                    <ul>
-                      {selected.historial_estados
-                        .slice()
-                        .reverse()
-                        .map((h, i) => (
+                {Array.isArray(selected.historial_estados) &&
+                  selected.historial_estados.length > 0 && (
+                    <div className="rec-hist">
+                      <h4>Historial de estados</h4>
+                      <ul>
+                        {[...selected.historial_estados].reverse().map((h, i) => (
                           <li key={i}>
                             <span
-                              className="rec-badge sm"
-                              style={{ background: ESTADO_COLOR[h.estado] }}
+                              className="rec-badge"
+                              style={{ background: ESTADO_COLOR[h.estado] || '#666' }}
                             >
                               {labelEstado(h.estado)}
                             </span>
-                            <span className="rec-hist-date">
-                              {formatFecha(h.en)}
-                            </span>
+                            <span className="rec-hist-date">{formatFecha(h.en)}</span>
                             {h.origen && (
                               <span className="rec-hist-origen">{h.origen}</span>
                             )}
                           </li>
                         ))}
-                    </ul>
-                  </div>
-                )}
+                      </ul>
+                    </div>
+                  )}
               </>
             )}
           </div>
@@ -538,7 +515,7 @@ export default function RecambiosView({ onChange }) {
 
       {facturasDisponibles.length > 0 && (
         <div className="rec-facturas">
-          <span className="rec-actions-label">Facturas en inventario</span>
+          <h4>Facturas importadas</h4>
           <ul>
             {facturasDisponibles.map((f) => {
               const n = all.filter((r) => r.factura === f).length
@@ -549,8 +526,8 @@ export default function RecambiosView({ onChange }) {
                   </span>
                   <button
                     type="button"
-                    className="btn-sm"
-                    onClick={() => borrarFactura(f)}
+                    className="btn-sm btn-danger"
+                    onClick={() => onDeleteFactura(f)}
                   >
                     Quitar
                   </button>
