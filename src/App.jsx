@@ -554,11 +554,11 @@ export default function App() {
         />
       )}
 
-      <div className="avisos-list">
+      <div className="avisos">
         {vista === 'calendario' || vista === 'preparaciones' || vista === 'recambios' ? null : avisos.length === 0 ? (
-          <p className="empty-hint">Sube un PDF de boletín o carga uno del historial.</p>
+          <p className="empty-state">Sube un PDF de boletín o carga uno del historial.</p>
         ) : avisosFiltrados.length === 0 ? (
-          <p className="empty-hint">Ningún aviso coincide con los filtros.</p>
+          <p className="empty-state">Ningún aviso coincide con los filtros.</p>
         ) : (
           avisosFiltrados.map((a) => (
             <div
