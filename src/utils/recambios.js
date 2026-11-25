@@ -2,41 +2,51 @@
  * Gestión de recambios BSH — estados y almacén
  *
  * Estados:
- *   recibido      → acaba de llegar en la factura
+ *   pedido        → facturado / pedido, aún no recibido físicamente
+ *   recibido      → material recibido
  *   en_furgoneta  → stock propio (lo guardas)
  *   utilizado     → montado en un aviso / reparación
  *   a_devolver    → sobra, devolver a BSH a fin de mes
+ *   consulta      → incidencia (no llegó, error, reclamación a BSH) — color rojizo
  */
 
 const KEY = 'boletines-recambios-v1'
 const MAX_ENTRIES = 2000
 
 export const ESTADOS_RECAMBIO = [
+  'pedido',
   'recibido',
   'en_furgoneta',
   'utilizado',
   'a_devolver',
+  'consulta',
 ]
 
 export const ESTADO_LABEL = {
+  pedido: 'Pedido',
   recibido: 'Recibido',
   en_furgoneta: 'En furgoneta',
   utilizado: 'Utilizado',
   a_devolver: 'A devolver',
+  consulta: 'Consulta',
 }
 
 export const ESTADO_COLOR = {
+  pedido: '#0ea5e9',
   recibido: '#3b82f6',
   en_furgoneta: '#8b5cf6',
   utilizado: '#22c55e',
   a_devolver: '#f59e0b',
+  consulta: '#ef4444',
 }
 
 export const TRANSICIONES = {
-  recibido: ['en_furgoneta', 'utilizado', 'a_devolver'],
-  en_furgoneta: ['utilizado', 'a_devolver', 'recibido'],
+  pedido: ['recibido', 'consulta', 'en_furgoneta', 'a_devolver'],
+  recibido: ['en_furgoneta', 'utilizado', 'a_devolver', 'consulta', 'pedido'],
+  en_furgoneta: ['utilizado', 'a_devolver', 'recibido', 'consulta'],
   utilizado: ['en_furgoneta', 'a_devolver', 'recibido'],
-  a_devolver: ['en_furgoneta', 'utilizado', 'recibido'],
+  a_devolver: ['en_furgoneta', 'utilizado', 'recibido', 'consulta'],
+  consulta: ['pedido', 'recibido', 'en_furgoneta', 'utilizado', 'a_devolver'],
 }
 
 export function puedeCambiarEstado(desde, hacia) {
@@ -148,14 +158,14 @@ export function importFromFacturaPayload(payload) {
       servicio: lin.servicio || null,
       aviso: normalizeAviso(lin.aviso) || null,
       pedido_sufijo: lin.pedido_sufijo || null,
-      estado: ESTADOS_RECAMBIO.includes(lin.estado) ? lin.estado : 'recibido',
+      estado: ESTADOS_RECAMBIO.includes(lin.estado) ? lin.estado : 'pedido',
       utilizado_en_aviso: normalizeAviso(lin.utilizado_en_aviso || lin.aviso) || null,
       notas: lin.notas || '',
       creado: now,
       actualizado: now,
       historial_estados: [
         {
-          estado: ESTADOS_RECAMBIO.includes(lin.estado) ? lin.estado : 'recibido',
+          estado: ESTADOS_RECAMBIO.includes(lin.estado) ? lin.estado : 'pedido',
           en: now,
           origen: 'import',
         },
@@ -242,6 +252,12 @@ export function marcarADevolver(id, opts) {
 export function marcarRecibido(id, opts) {
   return setEstadoRecambio(id, 'recibido', opts)
 }
+export function marcarPedido(id, opts) {
+  return setEstadoRecambio(id, 'pedido', opts)
+}
+export function marcarConsulta(id, opts) {
+  return setEstadoRecambio(id, 'consulta', opts)
+}
 
 export function updateRecambio(id, patch = {}) {
   const list = listRecambios()
@@ -310,10 +326,18 @@ export function listadoADevolver() {
   return recambiosPorEstado('a_devolver')
 }
 
+export function listadoConsulta() {
+  return recambiosPorEstado('consulta')
+}
+
+export function listadoPedidosPendientes() {
+  return recambiosPorEstado('pedido')
+}
+
 export function listadoStock({ incluirRecibidos = false } = {}) {
   return listRecambios().filter((r) =>
     incluirRecibidos
-      ? r.estado === 'en_furgoneta' || r.estado === 'recibido'
+      ? r.estado === 'en_furgoneta' || r.estado === 'recibido' || r.estado === 'pedido'
       : r.estado === 'en_furgoneta'
   )
 }
@@ -349,26 +373,36 @@ export function stockPorMaterial(filtroEstado = null) {
 
 export function statsRecambios() {
   const list = listRecambios()
-  const by = { recibido: 0, en_furgoneta: 0, utilizado: 0, a_devolver: 0 }
+  const by = {
+    pedido: 0,
+    recibido: 0,
+    en_furgoneta: 0,
+    utilizado: 0,
+    a_devolver: 0,
+    consulta: 0,
+  }
   let valorStock = 0
   let valorDevolver = 0
+  let valorConsulta = 0
   for (const r of list) {
     if (by[r.estado] != null) by[r.estado] += r.cantidad || 1
-    if (r.estado === 'en_furgoneta' || r.estado === 'recibido') {
+    if (r.estado === 'en_furgoneta' || r.estado === 'recibido' || r.estado === 'pedido') {
       valorStock += r.valor_neto || 0
     }
     if (r.estado === 'a_devolver') valorDevolver += r.valor_neto || 0
+    if (r.estado === 'consulta') valorConsulta += r.valor_neto || 0
   }
   return {
     total: list.length,
     ...by,
     valor_stock: Math.round(valorStock * 100) / 100,
     valor_a_devolver: Math.round(valorDevolver * 100) / 100,
+    valor_consulta: Math.round(valorConsulta * 100) / 100,
   }
 }
 
 export function accionesDisponibles(recambio) {
-  const estado = recambio?.estado || 'recibido'
+  const estado = recambio?.estado || 'pedido'
   const destinos = TRANSICIONES[estado] || []
   return destinos.map((e) => ({
     estado: e,
