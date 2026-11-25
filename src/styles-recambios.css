@@ -150,68 +150,60 @@
   font-size: 0.9rem;
 }
 
-.rec-banner-consulta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.85rem;
-  border-radius: 8px;
-  border: 1px solid #ef4444;
-  background: color-mix(in srgb, #ef4444 16%, transparent);
-  color: #fecaca;
-  font-size: 0.9rem;
+.rec-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
 }
 
-.rec-banner-consulta strong {
-  color: #fca5a5;
+@media (max-width: 900px) {
+  .rec-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
-.rec-estado-badge.consulta,
-.rec-badge-consulta {
-  background: #ef4444 !important;
-  color: #fff !important;
-}
-
-.rec-list {
+.rec-list-panel {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
-.rec-item {
+.rec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 0.9rem;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.rec-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.8rem;
   border: 1px solid var(--border, #333);
   border-radius: 10px;
   background: var(--card-bg, transparent);
-  cursor: pointer;
-  text-align: left;
   color: inherit;
   font: inherit;
-  width: 100%;
+  cursor: pointer;
 }
 
-.rec-item:hover,
-.rec-item.active {
+.rec-list-item:hover,
+.rec-list-item.active {
   border-color: var(--accent, #3b82f6);
 }
 
-.rec-item-main {
-  flex: 1 1 14rem;
-  min-width: 0;
-}
-
-.rec-item-top {
+.rec-list-top {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
 }
 
 .rec-badge {
@@ -225,81 +217,98 @@
   letter-spacing: 0.02em;
 }
 
-.rec-ref {
+.rec-mat {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
 }
 
 .rec-desc {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   opacity: 0.9;
 }
 
-.rec-meta {
-  margin: 0.25rem 0 0;
-  font-size: 0.78rem;
+.rec-list-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
   opacity: 0.7;
 }
 
-.rec-item-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.25rem;
-}
-
-.rec-precio {
-  font-weight: 700;
-  font-size: 0.95rem;
+.rec-list-name {
+  font-size: 0.85rem;
 }
 
 .rec-detail {
-  margin-top: 0.5rem;
   padding: 1rem;
   border: 1px solid var(--border, #333);
   border-radius: 12px;
   background: var(--card-bg, transparent);
 }
 
-.rec-detail-head {
+.rec-detail-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
 
-.rec-detail-actions {
+.rec-detail-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.rec-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.85rem;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+
+.rec-dl dt {
+  color: var(--muted, #888);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.rec-dl dd {
+  margin: 0;
+}
+
+.rec-actions {
+  margin: 0.75rem 0;
+}
+
+.rec-actions-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 0.35rem;
+}
+
+.rec-actions-btns {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
 }
 
-.rec-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-  gap: 0.65rem 1rem;
-  font-size: 0.9rem;
+.rec-field {
+  margin: 0.5rem 0;
 }
 
-.rec-detail-grid dt {
-  font-size: 0.72rem;
+.rec-field label {
+  display: block;
+  font-size: 0.78rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  opacity: 0.65;
-  margin: 0;
+  opacity: 0.7;
+  margin-bottom: 0.25rem;
 }
 
-.rec-detail-grid dd {
-  margin: 0.1rem 0 0;
-  font-weight: 600;
-}
-
-.rec-notes textarea {
+.rec-field textarea {
   width: 100%;
-  margin-top: 0.75rem;
   min-height: 4rem;
   padding: 0.5rem;
   border-radius: 8px;
@@ -341,20 +350,49 @@
   font-size: 0.82rem;
 }
 
+.rec-hist-date {
+  opacity: 0.65;
+  font-size: 0.75rem;
+}
+
+.rec-hist-origen {
+  opacity: 0.55;
+  font-size: 0.72rem;
+}
+
 .rec-stock {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.rec-stock-row {
+.rec-stock-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.rec-stock-main {
+  display: flex;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--border, #333);
-  border-radius: 8px;
+}
+
+.rec-stock-meta {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.rec-qty {
+  font-weight: 700;
+}
+
+.rec-aviso {
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
 .rec-empty {
@@ -363,4 +401,73 @@
   opacity: 0.7;
   border: 1px dashed var(--border, #444);
   border-radius: 10px;
+}
+
+.rec-facturas {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #333);
+}
+
+.rec-facturas ul {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.rec-facturas li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  padding: 0.35rem 0;
+}
+
+.btn-danger {
+  color: #fca5a5;
+  border-color: #ef4444;
+}
+
+.btn-sm.primary {
+  background: var(--accent, #3b82f6);
+  border-color: var(--accent, #3b82f6);
+  color: #fff;
+}
+
+html[data-theme='light'] .rec-error {
+  color: #991b1b;
+}
+
+html[data-theme='light'] .rec-import textarea,
+html[data-theme='light'] .rec-field textarea {
+  background: #fff;
+}
+
+.rec-banner-consulta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #ef4444;
+  background: color-mix(in srgb, #ef4444 16%, transparent);
+  color: #fecaca;
+  font-size: 0.9rem;
+}
+
+.rec-banner-consulta strong {
+  color: #fca5a5;
+}
+
+html[data-theme='light'] .rec-banner-consulta {
+  color: #991b1b;
+}
+
+html[data-theme='light'] .rec-banner-consulta strong {
+  color: #b91c1c;
 }
