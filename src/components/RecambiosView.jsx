@@ -14,7 +14,15 @@ import {
   ESTADO_LABEL,
   ESTADO_COLOR,
   labelEstado,
+  applyRemoteRecambios,
 } from '../utils/recambios'
+import {
+  isSupabaseConfigured,
+  cloudUpsertRecambiosBatch,
+  cloudListRecambios,
+  cloudDeleteRecambio,
+  cloudDeleteRecambiosByFactura,
+} from '../utils/recambiosCloud'
 
 function formatMoney(n) {
   if (n == null || Number.isNaN(Number(n))) return '—'
@@ -40,6 +48,8 @@ export default function RecambiosView({ onChange }) {
   const [showImport, setShowImport] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const [error, setError] = useState('')
+  const [cloudBusy, setCloudBusy] = useState(false)
+  const [cloudMsg, setCloudMsg] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [filtroAviso, setFiltroAviso] = useState('')
   const [busqueda, setBusqueda] = useState('')
@@ -51,6 +61,69 @@ export default function RecambiosView({ onChange }) {
     setTick((t) => t + 1)
     onChange?.()
   }, [onChange])
+
+  const pushToCloud = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      setCloudMsg('Supabase no configurado (variables de entorno).')
+      return
+    }
+    setCloudBusy(true)
+    setCloudMsg('')
+    setError('')
+    try {
+      const items = listRecambios()
+      const res = await cloudUpsertRecambiosBatch(items)
+      setCloudMsg(`Nube: guardados ${res.upserted} recambio(s).`)
+      refresh()
+    } catch (e) {
+      setError(`Error nube: ${e.message || e}`)
+    } finally {
+      setCloudBusy(false)
+    }
+  }, [refresh])
+
+  const pullFromCloud = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      setCloudMsg('Supabase no configurado (variables de entorno).')
+      return
+    }
+    setCloudBusy(true)
+    setCloudMsg('')
+    setError('')
+    try {
+      const remote = await cloudListRecambios()
+      const res = applyRemoteRecambios(remote)
+      setCloudMsg(
+        `Nube: cargados ${res.remote} · total local tras fusionar ${res.total}.`
+      )
+      refresh()
+    } catch (e) {
+      setError(`Error nube: ${e.message || e}`)
+    } finally {
+      setCloudBusy(false)
+    }
+  }, [refresh])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!isSupabaseConfigured()) return
+      try {
+        const remote = await cloudListRecambios()
+        if (cancelled) return
+        if (remote.length) {
+          applyRemoteRecambios(remote)
+          setTick((t) => t + 1)
+          setCloudMsg(`Sincronizado desde nube: ${remote.length} recambio(s).`)
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[recambios pull]', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const onEv = () => setTick((t) => t + 1)
@@ -128,6 +201,11 @@ export default function RecambiosView({ onChange }) {
       setImportText('')
       setShowImport(false)
       refresh()
+      if (isSupabaseConfigured() && res.added > 0) {
+        cloudUpsertRecambiosBatch(listRecambios())
+          .then((r) => setCloudMsg(`Nube: subidos ${r.upserted} tras importar.`))
+          .catch((e) => setError(`Error nube: ${e.message || e}`))
+      }
     } catch (e) {
       setError(e.message || String(e))
     }
@@ -138,6 +216,11 @@ export default function RecambiosView({ onChange }) {
     try {
       setEstadoRecambio(id, estado)
       refresh()
+      if (isSupabaseConfigured()) {
+        cloudUpsertRecambiosBatch(listRecambios()).catch((e) =>
+          console.warn('[recambios auto-push]', e)
+        )
+      }
     } catch (e) {
       setError(e.message || String(e))
     }
@@ -147,20 +230,35 @@ export default function RecambiosView({ onChange }) {
     if (!selected) return
     updateRecambio(selected.id, { notas: notasDraft })
     refresh()
+    if (isSupabaseConfigured()) {
+      cloudUpsertRecambiosBatch(listRecambios()).catch((e) =>
+        console.warn('[recambios auto-push]', e)
+      )
+    }
   }
 
   const onDelete = (id) => {
-    if (!window.confirm('¿Eliminar este recambio del listado local?')) return
+    if (!window.confirm('¿Eliminar este recambio del listado local y de la nube?')) return
     deleteRecambio(id)
     if (selectedId === id) setSelectedId(null)
     refresh()
+    if (isSupabaseConfigured()) {
+      cloudDeleteRecambio(id).catch((e) =>
+        console.warn('[recambios cloud delete]', e)
+      )
+    }
   }
 
   const onDeleteFactura = (fac) => {
-    if (!window.confirm(`¿Eliminar todos los recambios de la factura ${fac}?`)) return
+    if (!window.confirm(`¿Eliminar todos los recambios de la factura ${fac} (local y nube)?`)) return
     deleteByFactura(fac)
     setSelectedId(null)
     refresh()
+    if (isSupabaseConfigured()) {
+      cloudDeleteRecambiosByFactura(fac).catch((e) =>
+        console.warn('[recambios cloud delete factura]', e)
+      )
+    }
   }
 
   return (
@@ -174,11 +272,7 @@ export default function RecambiosView({ onChange }) {
           </p>
         </div>
         <div className="rec-toolbar-actions">
-          <button
-            type="button"
-            className="btn-sm"
-            onClick={() => setShowImport((v) => !v)}
-          >
+          <button type="button" className="btn-sm" onClick={() => setShowImport((v) => !v)}>
             {showImport ? 'Cerrar import' : 'Importar JSON factura'}
           </button>
           <button
@@ -187,6 +281,24 @@ export default function RecambiosView({ onChange }) {
             onClick={() => setVistaStock((v) => !v)}
           >
             {vistaStock ? 'Ver listado' : 'Vista stock'}
+          </button>
+          <button
+            type="button"
+            className="btn-sm primary"
+            disabled={cloudBusy || !isSupabaseConfigured()}
+            onClick={pushToCloud}
+            title="Guardar todos los recambios en Supabase"
+          >
+            {cloudBusy ? 'Sincronizando…' : 'Guardar en nube'}
+          </button>
+          <button
+            type="button"
+            className="btn-sm"
+            disabled={cloudBusy || !isSupabaseConfigured()}
+            onClick={pullFromCloud}
+            title="Cargar y fusionar recambios desde Supabase"
+          >
+            Cargar de nube
           </button>
         </div>
       </div>
@@ -223,6 +335,7 @@ export default function RecambiosView({ onChange }) {
       </div>
 
       {error && <div className="rec-error">{error}</div>}
+      {cloudMsg && <div className="rec-import-msg">{cloudMsg}</div>}
 
       {showImport && (
         <div className="rec-import">
@@ -294,8 +407,8 @@ export default function RecambiosView({ onChange }) {
 
       {aDevolver.length > 0 && filtroEstado !== 'a_devolver' && (
         <div className="rec-banner-devolver">
-          <strong>{aDevolver.length}</strong> pieza(s) marcadas para devolver a
-          BSH · {formatMoney(stats.valor_a_devolver)}
+          <strong>{aDevolver.length}</strong> pieza(s) marcadas para devolver a BSH ·{' '}
+          {formatMoney(stats.valor_a_devolver)}
           <button
             type="button"
             className="btn-sm"
@@ -311,8 +424,8 @@ export default function RecambiosView({ onChange }) {
 
       {enConsulta.length > 0 && filtroEstado !== 'consulta' && (
         <div className="rec-banner-consulta">
-          <strong>{enConsulta.length}</strong> pieza(s) en consulta / incidencia
-          · {formatMoney(stats.valor_consulta || 0)}
+          <strong>{enConsulta.length}</strong> pieza(s) en consulta / incidencia ·{' '}
+          {formatMoney(stats.valor_consulta || 0)}
           <button
             type="button"
             className="btn-sm"
@@ -396,9 +509,7 @@ export default function RecambiosView({ onChange }) {
                           {labelEstado(r.estado)}
                         </span>
                         <span className="rec-mat">{r.material || '—'}</span>
-                        {r.aviso && (
-                          <span className="rec-aviso">Aviso {r.aviso}</span>
-                        )}
+                        {r.aviso && <span className="rec-aviso">Aviso {r.aviso}</span>}
                       </div>
                       <p className="rec-desc">{r.descripcion || 'Sin descripción'}</p>
                       <p className="rec-list-meta">
@@ -462,10 +573,7 @@ export default function RecambiosView({ onChange }) {
                         key={a.estado}
                         type="button"
                         className="btn-sm"
-                        style={{
-                          borderColor: a.color,
-                          color: a.color,
-                        }}
+                        style={{ borderColor: a.color, color: a.color }}
                         onClick={() => cambiarEstado(selected.id, a.estado)}
                       >
                         {a.label}
@@ -485,28 +593,25 @@ export default function RecambiosView({ onChange }) {
                   />
                 </div>
 
-                {Array.isArray(selected.historial_estados) &&
-                  selected.historial_estados.length > 0 && (
-                    <div className="rec-hist">
-                      <h4>Historial de estados</h4>
-                      <ul>
-                        {[...selected.historial_estados].reverse().map((h, i) => (
-                          <li key={i}>
-                            <span
-                              className="rec-badge"
-                              style={{ background: ESTADO_COLOR[h.estado] || '#666' }}
-                            >
-                              {labelEstado(h.estado)}
-                            </span>
-                            <span className="rec-hist-date">{formatFecha(h.en)}</span>
-                            {h.origen && (
-                              <span className="rec-hist-origen">{h.origen}</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                {Array.isArray(selected.historial_estados) && selected.historial_estados.length > 0 && (
+                  <div className="rec-hist">
+                    <h4>Historial de estados</h4>
+                    <ul>
+                      {[...selected.historial_estados].reverse().map((h, i) => (
+                        <li key={i}>
+                          <span
+                            className="rec-badge"
+                            style={{ background: ESTADO_COLOR[h.estado] || '#666' }}
+                          >
+                            {labelEstado(h.estado)}
+                          </span>
+                          <span className="rec-hist-date">{formatFecha(h.en)}</span>
+                          {h.origen && <span className="rec-hist-origen">{h.origen}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </>
             )}
           </div>
